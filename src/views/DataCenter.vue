@@ -1,268 +1,406 @@
 <template>
   <div class="data-center">
-    <!-- 顶部统计卡片 -->
-    <div class="statistics-row">
-      <div v-for="stat in statistics" :key="stat.title" class="stat-card">
-        <div class="stat-icon" :style="{ backgroundColor: stat.color }">
-          <i :class="stat.icon"></i>
+    <!-- 数据总量区域 -->
+    <div class="data-total-section">
+      <div class="counter-display">
+        <div class="digit-group">
+          <div class="digit" v-for="(digit, index) in '01038'" :key="index">
+            {{ digit }}
+          </div>
         </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ stat.value }}</div>
-          <div class="stat-title">{{ stat.title }}</div>
+        <div class="unit">T</div>
+      </div>
+
+      <div class="storage-info">
+        <div class="storage-container">
+          <div class="storage-level" :style="{ height: '65%' }"></div>
+          <div class="storage-text">
+            <div>磁盘：</div>
+            <div>已使用1000T</div>
+            <div>剩余1500T</div>
+          </div>
+        </div>
+
+        <div class="system-status">
+          <div class="status-item">
+            <div class="status-label">CPU运行状态</div>
+            <div class="status-bar">
+              <div class="bar-fill" style="width: 70%"></div>
+            </div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">内存运行状态</div>
+            <div class="status-bar">
+              <div class="bar-fill" style="width: 85%"></div>
+            </div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">GPU运行状态</div>
+            <div class="status-bar">
+              <div class="bar-fill" style="width: 60%"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 数据图表区域 -->
-    <div class="charts-container">
-      <!-- 左侧图表 -->
-      <div class="chart-section">
-        <div class="section-header">
-          <h2>水质参数趋势</h2>
-          <div class="time-selector">
-            <button
-              v-for="period in timePeriods"
-              :key="period"
-              :class="['time-btn', { active: currentPeriod === period }]"
-              @click="currentPeriod = period"
-            >
-              {{ period }}
-            </button>
+    <div class="main-content">
+      <!-- 数据中心分布地图 -->
+      <div class="map-section">
+        <div class="section-title">数据中心分布</div>
+        <div class="map-container" ref="mapContainer">
+          <!-- 备选显示方案 -->
+          <div v-if="!mapLoaded" class="map-fallback">
+            <div class="location-list">
+              <div
+                v-for="loc in locations"
+                :key="loc.city"
+                class="location-item"
+                :class="{ active: selectedLocation.city === loc.city }"
+                @click="selectLocation(loc)"
+              >
+                <div class="location-dot"></div>
+                <div class="location-info">
+                  <div class="location-name">{{ loc.city }}</div>
+                  <div class="location-detail">{{ loc.provider }}</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="chart-wrapper" ref="waterQualityChart"></div>
-      </div>
-
-      <!-- 右侧图表 -->
-      <div class="chart-section">
-        <div class="section-header">
-          <h2>设备运行状态</h2>
-          <div class="type-selector">
-            <select v-model="selectedDeviceType">
-              <option value="all">所有设备</option>
-              <option value="camera">摄像设备</option>
-              <option value="sensor">传感器</option>
-            </select>
+        <div class="data-center-info">
+          <div class="info-box">
+            <div class="info-label">地点：</div>
+            <div class="info-value">{{ selectedLocation.city }}</div>
+          </div>
+          <div class="info-box">
+            <div class="info-label">服务商：</div>
+            <div class="info-value">{{ selectedLocation.provider }}</div>
+          </div>
+          <div class="info-box">
+            <div class="info-label">连接：</div>
+            <div class="info-value">{{ selectedLocation.latency }}</div>
           </div>
         </div>
-        <div class="chart-wrapper" ref="deviceStatusChart"></div>
       </div>
-    </div>
 
-    <!-- 数据表格 -->
-    <div class="data-table-section">
-      <div class="section-header">
-        <h2>实时数据记录</h2>
-        <div class="table-controls">
-          <input
-            type="text"
-            v-model="searchQuery"
-            placeholder="搜索..."
-            class="search-input"
-          />
-          <button class="export-btn">导出数据</button>
+      <!-- 传感器信息表格 -->
+      <div class="sensor-section">
+        <div class="section-title">传感器信息</div>
+        <div class="time-info">
+          <div class="time-item">
+            <div class="time-label">平均传输时长</div>
+            <div class="time-value">02:45</div>
+          </div>
+          <div class="time-item">
+            <div class="time-label">平均处理时长</div>
+            <div class="time-value">00:02</div>
+          </div>
+        </div>
+        <div class="sensor-table">
+          <table>
+            <thead>
+              <tr>
+                <th>设备</th>
+                <th>编号</th>
+                <th>类型</th>
+                <th>大小</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in sensorData" :key="index">
+                <td>{{ item.device }}</td>
+                <td>{{ item.code }}</td>
+                <td>{{ item.type }}</td>
+                <td>{{ item.size }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, index) in tableData" :key="index">
-              <td>{{ row.timestamp }}</td>
-              <td>{{ row.deviceId }}</td>
-              <td>{{ row.temperature }}</td>
-              <td>{{ row.ph }}</td>
-              <td>{{ row.oxygen }}</td>
-              <td>{{ row.status }}</td>
-            </tr>
-          </tbody>
-        </table>
+
+      <!-- 数据统计图表 -->
+      <div class="stats-section">
+        <div class="data-type-stats">
+          <div class="section-title">数据类型统计</div>
+          <div class="pyramid-chart" ref="pyramidChart"></div>
+        </div>
+        <div class="data-distribution">
+          <div class="section-title">数据类型占比</div>
+          <div class="radar-chart" ref="radarChart"></div>
+        </div>
+        <div class="data-flow">
+          <div class="section-title">结构化数据</div>
+          <div class="sankey-chart" ref="sankeyChart"></div>
+        </div>
       </div>
-      <div class="pagination">
-        <button :disabled="currentPage === 1" @click="currentPage--">
-          上一页
-        </button>
-        <span>第 {{ currentPage }} 页</span>
-        <button :disabled="currentPage === totalPages" @click="currentPage++">
-          下一页
-        </button>
+
+      <!-- 数据库交互统计 -->
+      <div class="database-section">
+        <div class="section-title">数据库交互统计</div>
+        <div class="db-stats">
+          <div class="db-info">
+            <div>数据库：MySQL, HBase</div>
+            <div>查询次数：567890</div>
+            <div>成功次数：567890</div>
+            <div>查询时间：0.1s</div>
+          </div>
+          <div class="db-system-btn">访问数据服务系统</div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import * as echarts from "echarts";
+import AMapLoader from "@amap/amap-jsapi-loader";
 
 export default {
   name: "DataCenter",
   setup() {
-    const currentPeriod = ref("24小时");
-    const selectedDeviceType = ref("all");
-    const searchQuery = ref("");
-    const currentPage = ref(1);
-    const totalPages = ref(10);
+    const mapContainer = ref(null);
+    const pyramidChart = ref(null);
+    const radarChart = ref(null);
+    const sankeyChart = ref(null);
+    const mapLoaded = ref(false);
+    let map = null;
+    let markers = [];
 
-    const statistics = ref([
-      { title: "在线设备", value: "42", color: "#4CAF50", icon: "icon-device" },
-      { title: "报警次数", value: "3", color: "#F44336", icon: "icon-alert" },
+    const locations = [
       {
-        title: "数据采集量",
-        value: "1,234",
-        color: "#2196F3",
-        icon: "icon-data",
+        city: "杭州",
+        provider: "阿里云",
+        latency: "30ms",
+        position: [120.19, 30.26],
       },
-      { title: "运行天数", value: "365", color: "#FF9800", icon: "icon-time" },
-    ]);
-
-    const timePeriods = ["24小时", "7天", "30天", "自定义"];
-    const tableHeaders = [
-      "时间",
-      "设备ID",
-      "温度(°C)",
-      "pH值",
-      "溶解氧(mg/L)",
-      "状态",
+      {
+        city: "北京",
+        provider: "腾讯云",
+        latency: "45ms",
+        position: [116.46, 39.92],
+      },
+      {
+        city: "上海",
+        provider: "华为云",
+        latency: "35ms",
+        position: [121.47, 31.23],
+      },
+      {
+        city: "广州",
+        provider: "阿里云",
+        latency: "40ms",
+        position: [113.23, 23.16],
+      },
     ];
 
-    const tableData = ref([
-      {
-        timestamp: "2024-01-31 14:30:00",
-        deviceId: "DEV001",
-        temperature: "25.6",
-        ph: "7.8",
-        oxygen: "6.5",
-        status: "正常",
-      },
-      // ... 更多数据
+    const selectedLocation = ref(locations[0]);
+
+    const sensorData = ref([
+      { device: "水底摄像头", code: "video-1", type: "H.264", size: "4Mb" },
+      { device: "水底摄像头", code: "video-2", type: "4CIF", size: "128kb" },
+      { device: "水底摄像头", code: "video-3", type: "H.264", size: "100b" },
+      { device: "云台", code: "holder-1", type: "H.264", size: "1kb" },
+      { device: "声呐", code: "sonar-1", type: "CSV", size: "10kb" },
+      { device: "传感器", code: "sensor-1", type: "TXT", size: "2kb" },
+      { device: "气象站", code: "meteor-1", type: "TXT", size: "500b" },
     ]);
 
-    let waterQualityChart = null;
-    let deviceStatusChart = null;
-
-    onMounted(() => {
-      initWaterQualityChart();
-      initDeviceStatusChart();
-    });
-
-    const initWaterQualityChart = () => {
-      const chartDom = document.querySelector(".chart-wrapper");
-      waterQualityChart = echarts.init(chartDom);
-
-      const option = {
-        tooltip: {
-          trigger: "axis",
-        },
-        legend: {
-          data: ["温度", "pH值", "溶解氧"],
-          textStyle: { color: "#fff" },
-        },
-        grid: {
-          left: "3%",
-          right: "4%",
-          bottom: "3%",
-          containLabel: true,
-        },
-        xAxis: {
-          type: "category",
-          boundaryGap: false,
-          data: ["00:00", "06:00", "12:00", "18:00", "24:00"],
-          axisLabel: { color: "#fff" },
-        },
-        yAxis: {
-          type: "value",
-          axisLabel: { color: "#fff" },
-        },
-        series: [
-          {
-            name: "温度",
-            type: "line",
-            data: [23, 24, 25, 26, 25],
-            smooth: true,
-          },
-          {
-            name: "pH值",
-            type: "line",
-            data: [7.5, 7.6, 7.8, 7.7, 7.6],
-            smooth: true,
-          },
-          {
-            name: "溶解氧",
-            type: "line",
-            data: [6.2, 6.5, 6.8, 6.6, 6.4],
-            smooth: true,
-          },
-        ],
-      };
-
-      waterQualityChart.setOption(option);
+    const selectLocation = (location) => {
+      selectedLocation.value = location;
     };
 
-    const initDeviceStatusChart = () => {
-      const chartDom = document.querySelectorAll(".chart-wrapper")[1];
-      deviceStatusChart = echarts.init(chartDom);
+    const initMap = async () => {
+      try {
+        const AMap = await AMapLoader.load({
+          key: "您的高德地图 Key",
+          version: "2.0",
+          plugins: ["AMap.ToolBar", "AMap.Scale"],
+        });
+
+        map = new AMap.Map(mapContainer.value, {
+          zoom: 5,
+          center: [116.397428, 39.90923],
+          mapStyle: "amap://styles/dark",
+        });
+
+        locations.forEach((loc) => {
+          const marker = new AMap.Marker({
+            position: loc.position,
+            title: loc.city,
+          });
+
+          marker.on("click", () => {
+            selectedLocation.value = loc;
+          });
+
+          markers.push(marker);
+        });
+
+        map.add(markers);
+        mapLoaded.value = true;
+      } catch (e) {
+        console.error("地图加载失败:", e);
+      }
+    };
+
+    onMounted(() => {
+      initMap();
+      initPyramidChart();
+      initRadarChart();
+      initSankeyChart();
+
+      window.addEventListener("resize", () => {
+        pyramidChart.value?.resize();
+        radarChart.value?.resize();
+        sankeyChart.value?.resize();
+        map?.resize();
+      });
+    });
+
+    onUnmounted(() => {
+      if (map) {
+        map.destroy();
+      }
+    });
+
+    const initPyramidChart = () => {
+      const chart = echarts.init(document.querySelector(".pyramid-chart"));
+      pyramidChart.value = chart;
 
       const option = {
         tooltip: {
           trigger: "item",
-        },
-        legend: {
-          top: "5%",
-          left: "center",
-          textStyle: { color: "#fff" },
+          formatter: "{b} : {c}",
         },
         series: [
           {
-            name: "设备状态",
-            type: "pie",
-            radius: ["40%", "70%"],
-            avoidLabelOverlap: false,
-            itemStyle: {
-              borderRadius: 10,
-              borderColor: "#fff",
-              borderWidth: 2,
-            },
+            type: "funnel",
+            width: "80%",
+            height: "80%",
+            min: 0,
+            max: 100,
+            sort: "descending",
+            gap: 2,
             label: {
-              show: false,
-              position: "center",
+              show: true,
+              position: "inside",
+            },
+            itemStyle: {
+              borderColor: "#fff",
+              borderWidth: 1,
             },
             emphasis: {
               label: {
-                show: true,
-                fontSize: "20",
-                fontWeight: "bold",
+                fontSize: 20,
               },
             },
-            labelLine: {
-              show: false,
-            },
             data: [
-              { value: 35, name: "正常运行" },
-              { value: 5, name: "离线" },
-              { value: 2, name: "故障" },
+              { value: 100, name: "采集" },
+              { value: 80, name: "清洗" },
+              { value: 60, name: "分析" },
+              { value: 40, name: "存储" },
+              { value: 20, name: "应用" },
             ],
           },
         ],
       };
 
-      deviceStatusChart.setOption(option);
+      chart.setOption(option);
+    };
+
+    const initRadarChart = () => {
+      const chart = echarts.init(document.querySelector(".radar-chart"));
+      radarChart.value = chart;
+
+      const option = {
+        radar: {
+          indicator: [
+            { name: "视频数据", max: 100 },
+            { name: "图像数据", max: 100 },
+            { name: "文本数据", max: 100 },
+            { name: "传感器数据", max: 100 },
+            { name: "其他数据", max: 100 },
+          ],
+          shape: "pentagon",
+          splitNumber: 5,
+          axisName: {
+            color: "#fff",
+          },
+          splitLine: {
+            lineStyle: {
+              color: "rgba(255, 255, 255, 0.2)",
+            },
+          },
+          splitArea: {
+            show: false,
+          },
+          axisLine: {
+            lineStyle: {
+              color: "rgba(255, 255, 255, 0.2)",
+            },
+          },
+        },
+        series: [
+          {
+            type: "radar",
+            data: [
+              {
+                value: [90, 85, 70, 95, 60],
+                name: "数据分布",
+                itemStyle: {
+                  color: "#58D9F9",
+                },
+                areaStyle: {
+                  color: "rgba(88, 217, 249, 0.3)",
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      chart.setOption(option);
+    };
+
+    const initSankeyChart = () => {
+      const chart = echarts.init(document.querySelector(".sankey-chart"));
+      sankeyChart.value = chart;
+
+      const option = {
+        series: {
+          type: "sankey",
+          layout: "none",
+          emphasis: {
+            focus: "adjacency",
+          },
+          data: [
+            { name: "原始数据" },
+            { name: "预处理" },
+            { name: "特征提取" },
+            { name: "分类存储" },
+            { name: "应用层" },
+          ],
+          links: [
+            { source: "原始数据", target: "预处理", value: 5 },
+            { source: "预处理", target: "特征提取", value: 3 },
+            { source: "特征提取", target: "分类存储", value: 2 },
+            { source: "分类存储", target: "应用层", value: 1 },
+          ],
+        },
+      };
+
+      chart.setOption(option);
     };
 
     return {
-      currentPeriod,
-      selectedDeviceType,
-      searchQuery,
-      currentPage,
-      totalPages,
-      statistics,
-      timePeriods,
-      tableHeaders,
-      tableData,
+      sensorData,
+      selectedLocation,
+      mapContainer,
+      mapLoaded,
+      locations,
+      selectLocation,
     };
   },
 };
@@ -272,129 +410,177 @@ export default {
 .data-center {
   padding: 20px;
   background-color: #0a1929;
-  min-height: calc(100vh - 60px);
+  min-height: 100vh;
   color: white;
 }
 
-.statistics-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.stat-card {
+.data-total-section {
   background-color: rgba(0, 30, 60, 0.5);
-  border-radius: 8px;
   padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.stat-icon {
-  width: 48px;
-  height: 48px;
   border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 20px;
+}
+
+.counter-display {
   display: flex;
   align-items: center;
-  justify-content: center;
 }
 
-.stat-content {
-  flex: 1;
+.digit-group {
+  display: flex;
+  gap: 5px;
 }
 
-.stat-value {
+.digit {
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 10px 15px;
+  border-radius: 4px;
   font-size: 24px;
   font-weight: bold;
+  color: #58d9f9;
+}
+
+.unit {
+  margin-left: 10px;
+  color: #90caf9;
+  font-size: 20px;
+}
+
+.storage-info {
+  display: flex;
+  gap: 40px;
+  flex-grow: 1;
+}
+
+.storage-container {
+  width: 100px;
+  height: 150px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.storage-level {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background-color: #58d9f9;
+  transition: height 0.3s ease;
+}
+
+.storage-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: white;
+  font-size: 12px;
+  width: 100%;
+}
+
+.system-status {
+  flex-grow: 1;
+}
+
+.status-item {
+  margin-bottom: 15px;
+}
+
+.status-label {
+  color: #90caf9;
   margin-bottom: 5px;
 }
 
-.stat-title {
-  color: #90caf9;
-  font-size: 14px;
+.status-bar {
+  height: 8px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
 }
 
-.charts-container {
+.bar-fill {
+  height: 100%;
+  background-color: #58d9f9;
+  transition: width 0.3s ease;
+}
+
+.main-content {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2fr 1fr;
   gap: 20px;
-  margin-bottom: 20px;
 }
 
-.chart-section {
+.section-title {
+  color: #ff4081;
+  font-size: 16px;
+  margin-bottom: 15px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.map-section,
+.sensor-section,
+.stats-section,
+.database-section {
   background-color: rgba(0, 30, 60, 0.5);
-  border-radius: 8px;
   padding: 20px;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  border-radius: 8px;
   margin-bottom: 20px;
 }
 
-.section-header h2 {
-  margin: 0;
-  font-size: 18px;
+.map-container {
+  height: 400px;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.data-center-info {
+  margin-top: 15px;
+  display: flex;
+  gap: 20px;
+}
+
+.info-box {
+  display: flex;
+  gap: 10px;
+}
+
+.info-label {
   color: #90caf9;
 }
 
-.time-selector {
+.info-value {
+  color: #58d9f9;
+}
+
+.time-info {
   display: flex;
-  gap: 10px;
+  justify-content: space-around;
+  margin-bottom: 20px;
 }
 
-.time-btn {
-  background: none;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  padding: 5px 15px;
-  border-radius: 4px;
-  cursor: pointer;
+.time-item {
+  text-align: center;
 }
 
-.time-btn.active {
-  background-color: #1976d2;
-  border-color: #1976d2;
+.time-label {
+  color: #90caf9;
+  margin-bottom: 5px;
 }
 
-.chart-wrapper {
-  height: 300px;
+.time-value {
+  color: #58d9f9;
+  font-size: 24px;
+  font-weight: bold;
 }
 
-.data-table-section {
-  background-color: rgba(0, 30, 60, 0.5);
-  border-radius: 8px;
-  padding: 20px;
-}
-
-.table-controls {
-  display: flex;
-  gap: 10px;
-}
-
-.search-input {
-  padding: 5px 10px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background-color: rgba(0, 0, 0, 0.2);
-  color: white;
-}
-
-.export-btn {
-  background-color: #4caf50;
-  color: white;
-  border: none;
-  padding: 5px 15px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.table-wrapper {
-  margin: 20px 0;
+.sensor-table {
+  width: 100%;
   overflow-x: auto;
 }
 
@@ -405,47 +591,105 @@ table {
 
 th,
 td {
-  padding: 12px;
+  padding: 10px;
   text-align: left;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 th {
-  background-color: rgba(0, 0, 0, 0.2);
   color: #90caf9;
+  font-weight: normal;
 }
 
-tr:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+td {
+  color: #fff;
 }
 
-.pagination {
+.pyramid-chart,
+.radar-chart,
+.sankey-chart {
+  height: 300px;
+}
+
+.db-stats {
   display: flex;
-  justify-content: center;
-  gap: 20px;
+  justify-content: space-between;
   align-items: center;
-  margin-top: 20px;
 }
 
-.pagination button {
-  background-color: #1976d2;
-  color: white;
-  border: none;
-  padding: 5px 15px;
+.db-info {
+  color: #90caf9;
+  line-height: 1.6;
+}
+
+.db-system-btn {
+  background-color: #004bcc;
+  padding: 10px 20px;
   border-radius: 4px;
   cursor: pointer;
+  transition: background-color 0.3s;
 }
 
-.pagination button:disabled {
-  background-color: rgba(25, 118, 210, 0.5);
-  cursor: not-allowed;
+.db-system-btn:hover {
+  background-color: #0056e9;
 }
 
-select {
+.map-fallback {
+  height: 100%;
   background-color: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  padding: 5px 10px;
   border-radius: 4px;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.location-list {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  padding: 20px;
+}
+
+.location-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background-color: rgba(0, 30, 60, 0.5);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.location-item:hover {
+  background-color: rgba(0, 30, 60, 0.8);
+}
+
+.location-item.active {
+  background-color: #004bcc;
+}
+
+.location-dot {
+  width: 12px;
+  height: 12px;
+  background-color: #58d9f9;
+  border-radius: 50%;
+}
+
+.location-info {
+  flex: 1;
+}
+
+.location-name {
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 5px;
+}
+
+.location-detail {
+  color: #90caf9;
+  font-size: 0.9em;
 }
 </style>
