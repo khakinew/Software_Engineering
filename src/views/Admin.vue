@@ -110,6 +110,14 @@
         <div v-if="currentMenu === 'logs'" class="content-section">
           <div class="section-header">
             <h3>系统日志</h3>
+            <div class="log-actions">
+              <button class="action-btn export" @click="exportLogs">
+                <i class="fas fa-download"></i> 导出日志
+              </button>
+              <button class="action-btn clear" @click="clearLogs">
+                <i class="fas fa-trash"></i> 清除日志
+              </button>
+            </div>
             <div class="log-filters">
               <select v-model="logFilter.type">
                 <option value="all">所有类型</option>
@@ -121,7 +129,11 @@
             </div>
           </div>
           <div class="log-list">
+            <div v-if="filteredLogs.length === 0" class="no-logs">
+              暂无日志记录
+            </div>
             <div
+              v-else
               v-for="log in filteredLogs"
               :key="log.id"
               class="log-item"
@@ -252,6 +264,75 @@ export default {
     const currentMenu = ref("users");
     const showAddUserModal = ref(false);
 
+    // 系统设置数据
+    const settings = ref({
+      systemName: "岸基数据中心海洋牧场大数据可视化系统",
+      backupCycle: "daily",
+      logRetention: "30",
+      maintenanceTime: "03:00",
+    });
+
+    // 日志数据 - 移到最前面定义
+    const logs = ref([
+      {
+        id: 1,
+        time: "2024-02-01 10:00:00",
+        content: "系统启动成功",
+        type: "info",
+      },
+      {
+        id: 2,
+        time: "2024-02-01 10:05:00",
+        content: "用户admin登录系统",
+        type: "info",
+      },
+      {
+        id: 3,
+        time: "2024-02-01 10:30:00",
+        content: "检测到异常登录尝试",
+        type: "warning",
+      },
+      {
+        id: 4,
+        time: "2024-02-01 11:00:00",
+        content: "数据库连接失败",
+        type: "error",
+      },
+      {
+        id: 5,
+        time: "2024-02-01 11:05:00",
+        content: "数据库恢复连接",
+        type: "info",
+      },
+    ]);
+
+    // 日志筛选
+    const logFilter = ref({
+      type: "all",
+      date: "",
+    });
+
+    // 修改计算属性的定义
+    const filteredLogs = computed(() => {
+      if (!logs.value) return [];
+
+      return logs.value.filter((log) => {
+        if (
+          logFilter.value.type !== "all" &&
+          log.type !== logFilter.value.type
+        ) {
+          return false;
+        }
+        if (
+          logFilter.value.date &&
+          !log.time.startsWith(logFilter.value.date)
+        ) {
+          return false;
+        }
+        return true;
+      });
+    });
+
     const menuItems = [
       { key: "users", label: "用户管理", icon: "fas fa-users" },
       { key: "settings", label: "系统设置", icon: "fas fa-cog" },
@@ -259,6 +340,41 @@ export default {
       { key: "monitor", label: "系统监控", icon: "fas fa-desktop" },
       { key: "backup", label: "数据备份", icon: "fas fa-database" },
     ];
+
+    // 添加日志的方法
+    const addLog = (content, type = "info") => {
+      const newLog = {
+        id: logs.value.length + 1,
+        time: new Date().toLocaleString(),
+        content,
+        type,
+      };
+      logs.value.push(newLog);
+    };
+
+    // 清除日志的方法
+    const clearLogs = () => {
+      if (confirm("确定要清除所有日志吗？")) {
+        logs.value = [];
+      }
+    };
+
+    // 导出日志的方法
+    const exportLogs = () => {
+      const logText = logs.value
+        .map((log) => `${log.time} [${log.type}] ${log.content}`)
+        .join("\n");
+
+      const blob = new Blob([logText], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `系统日志_${new Date().toLocaleDateString()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
 
     // 系统监控数据
     const systemStatus = ref({
@@ -346,64 +462,6 @@ export default {
       },
     ]);
 
-    // 日志数据
-    const logs = ref([
-      {
-        id: 1,
-        time: "2024-02-01 10:00:00",
-        content: "系统启动成功",
-        type: "info",
-      },
-      {
-        id: 2,
-        time: "2024-02-01 10:05:00",
-        content: "用户admin登录系统",
-        type: "info",
-      },
-      {
-        id: 3,
-        time: "2024-02-01 10:30:00",
-        content: "检测到异常登录尝试",
-        type: "warning",
-      },
-      {
-        id: 4,
-        time: "2024-02-01 11:00:00",
-        content: "数据库连接失败",
-        type: "error",
-      },
-      {
-        id: 5,
-        time: "2024-02-01 11:05:00",
-        content: "数据库恢复连接",
-        type: "info",
-      },
-    ]);
-
-    // 日志筛选
-    const logFilter = ref({
-      type: "all",
-      date: "",
-    });
-
-    const filteredLogs = computed(() => {
-      return logs.value.filter((log) => {
-        if (
-          logFilter.value.type !== "all" &&
-          log.type !== logFilter.value.type
-        ) {
-          return false;
-        }
-        if (
-          logFilter.value.date &&
-          !log.time.startsWith(logFilter.value.date)
-        ) {
-          return false;
-        }
-        return true;
-      });
-    });
-
     // 新用户数据
     const newUser = ref({
       username: "",
@@ -462,13 +520,6 @@ export default {
     };
 
     // 系统设置
-    const settings = ref({
-      systemName: "岸基数据中心海洋牧场大数据可视化系统",
-      backupCycle: "daily",
-      logRetention: "30",
-      maintenanceTime: "03:00",
-    });
-
     const saveSettings = () => {
       // 实现保存设置功能
       alert("设置已保存");
@@ -493,11 +544,15 @@ export default {
       logFilter,
       filteredLogs,
       logs,
+      settings,
       switchMenu: (menu) => (currentMenu.value = menu),
       addUser,
       deleteUser,
       saveSettings,
       performBackup,
+      addLog,
+      clearLogs,
+      exportLogs,
     };
   },
 };
@@ -665,6 +720,13 @@ th {
   padding: 10px 20px;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.log-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
 .log-filters {
