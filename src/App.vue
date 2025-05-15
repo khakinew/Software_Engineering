@@ -1,30 +1,167 @@
 <template>
-  <nav>
-    <router-link to="/">Home</router-link> |
-    <router-link to="/about">About</router-link>
-  </nav>
-  <router-view/>
+  <div id="app">
+    <nav class="navbar">
+      <router-link to="/" class="nav-item">主要信息</router-link>
+      <router-link to="/underwater" class="nav-item">水下系统</router-link>
+      <router-link to="/intelligent" class="nav-item">智能中心</router-link>
+      <router-link v-if="isAdmin" to="/admin" class="nav-item"
+        >管理员管理</router-link
+      >
+      <div class="auth-section">
+        <template v-if="isLoggedIn">
+          <span>{{ user ? user.username : "" }}</span>
+          <button @click="handleLogout">退出</button>
+        </template>
+        <template v-else>
+          <button @click="showLoginModal = true">登录</button>
+        </template>
+      </div>
+    </nav>
+
+    <!-- 登录模态框 -->
+    <div v-if="showLoginModal" class="modal">
+      <div class="modal-content">
+        <h2>登录</h2>
+        <input v-model="loginForm.username" placeholder="用户名" />
+        <input
+          v-model="loginForm.password"
+          type="password"
+          placeholder="密码"
+        />
+        <button @click="handleLogin">登录</button>
+        <button @click="showLoginModal = false">取消</button>
+      </div>
+    </div>
+
+    <router-view />
+  </div>
 </template>
+
+<script>
+import { computed, reactive, ref } from "vue";
+import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+
+export default {
+  name: "App",
+  setup() {
+    const store = useStore();
+    const router = useRouter();
+    const showLoginModal = ref(false);
+    const loginForm = reactive({
+      username: "",
+      password: "",
+    });
+
+    const user = computed(() => store.state.user);
+    const isAdmin = computed(() => store.getters.isAdmin);
+    const isLoggedIn = computed(() => store.getters.isLoggedIn);
+
+    const handleLogin = async () => {
+      try {
+        await store.dispatch("login", loginForm);
+        showLoginModal.value = false;
+        loginForm.username = "";
+        loginForm.password = "";
+      } catch (error) {
+        console.error("登录失败:", error);
+      }
+    };
+
+    const handleLogout = () => {
+      store.commit("logout");
+      if (router.currentRoute.value.meta.requiresAdmin) {
+        router.push("/");
+      }
+    };
+
+    return {
+      showLoginModal,
+      loginForm,
+      user,
+      isAdmin,
+      isLoggedIn,
+      handleLogin,
+      handleLogout,
+    };
+  },
+};
+</script>
 
 <style>
 #app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
+  font-family: Arial, sans-serif;
 }
 
-nav {
-  padding: 30px;
+.navbar {
+  background-color: #2c3e50;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  color: white;
 }
 
-nav a {
-  font-weight: bold;
-  color: #2c3e50;
+.nav-item {
+  color: white;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  margin-right: 1rem;
 }
 
-nav a.router-link-exact-active {
-  color: #42b983;
+.nav-item:hover {
+  background-color: #34495e;
+  border-radius: 4px;
+}
+
+.auth-section {
+  margin-left: auto;
+}
+
+.auth-section button {
+  margin-left: 1rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+input {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+button {
+  background-color: #42b983;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #3aa876;
 }
 </style>
