@@ -346,6 +346,40 @@ export default {
       },
     ]);
 
+    // 日志数据
+    const logs = ref([
+      {
+        id: 1,
+        time: "2024-02-01 10:00:00",
+        content: "系统启动成功",
+        type: "info",
+      },
+      {
+        id: 2,
+        time: "2024-02-01 10:05:00",
+        content: "用户admin登录系统",
+        type: "info",
+      },
+      {
+        id: 3,
+        time: "2024-02-01 10:30:00",
+        content: "检测到异常登录尝试",
+        type: "warning",
+      },
+      {
+        id: 4,
+        time: "2024-02-01 11:00:00",
+        content: "数据库连接失败",
+        type: "error",
+      },
+      {
+        id: 5,
+        time: "2024-02-01 11:05:00",
+        content: "数据库恢复连接",
+        type: "info",
+      },
+    ]);
+
     // 日志筛选
     const logFilter = ref({
       type: "all",
@@ -458,6 +492,7 @@ export default {
       newUser,
       logFilter,
       filteredLogs,
+      logs,
       switchMenu: (menu) => (currentMenu.value = menu),
       addUser,
       deleteUser,
