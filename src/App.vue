@@ -3,6 +3,7 @@
     <nav v-if="!isLoginPage" class="navbar">
       <router-link to="/" class="nav-item">主要信息</router-link>
       <router-link to="/underwater" class="nav-item">水下系统</router-link>
+      <router-link to="/datacenter" class="nav-item">数据中心</router-link>
       <router-link to="/intelligent" class="nav-item">智能中心</router-link>
       <router-link v-if="isAdmin" to="/admin" class="nav-item"
         >管理员管理</router-link

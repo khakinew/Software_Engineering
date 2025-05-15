@@ -4,6 +4,7 @@ import UnderwaterSystem from "../views/UnderwaterSystem.vue";
 import IntelligentCenter from "../views/IntelligentCenter.vue";
 import Admin from "../views/Admin.vue";
 import Login from "../views/Login.vue";
+import DataCenter from "../views/DataCenter.vue";
 import store from "../store";
 
 const routes = [
@@ -29,6 +30,12 @@ const routes = [
     path: "/intelligent",
     name: "IntelligentCenter",
     component: IntelligentCenter,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/datacenter",
+    name: "DataCenter",
+    component: DataCenter,
     meta: { requiresAuth: true },
   },
   {
