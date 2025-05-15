@@ -48,23 +48,19 @@
       <!-- 数据中心分布地图 -->
       <div class="map-section">
         <div class="section-title">数据中心分布</div>
-        <div class="map-container" ref="mapContainer">
-          <!-- 备选显示方案 -->
-          <div v-if="!mapLoaded" class="map-fallback">
-            <div class="location-list">
-              <div
-                v-for="loc in locations"
-                :key="loc.city"
-                class="location-item"
-                :class="{ active: selectedLocation.city === loc.city }"
-                @click="selectLocation(loc)"
-              >
-                <div class="location-dot"></div>
-                <div class="location-info">
-                  <div class="location-name">{{ loc.city }}</div>
-                  <div class="location-detail">{{ loc.provider }}</div>
-                </div>
-              </div>
+        <div class="map-container" ref="mapContainer"></div>
+        <div class="location-list">
+          <div
+            v-for="loc in locations"
+            :key="loc.city"
+            class="location-item"
+            :class="{ active: selectedLocation.city === loc.city }"
+            @click="selectLocation(loc)"
+          >
+            <div class="location-dot"></div>
+            <div class="location-info">
+              <div class="location-name">{{ loc.city }}</div>
+              <div class="location-detail">{{ loc.provider }}</div>
             </div>
           </div>
         </div>
@@ -155,7 +151,6 @@
 <script>
 import { ref, onMounted, onUnmounted } from "vue";
 import * as echarts from "echarts";
-import AMapLoader from "@amap/amap-jsapi-loader";
 
 export default {
   name: "DataCenter",
@@ -165,33 +160,31 @@ export default {
     const radarChart = ref(null);
     const sankeyChart = ref(null);
     const mapLoaded = ref(false);
-    let map = null;
-    let markers = [];
 
     const locations = [
       {
         city: "杭州",
         provider: "阿里云",
         latency: "30ms",
-        position: [120.19, 30.26],
+        region: "华东",
       },
       {
         city: "北京",
         provider: "腾讯云",
         latency: "45ms",
-        position: [116.46, 39.92],
+        region: "华北",
       },
       {
         city: "上海",
         provider: "华为云",
         latency: "35ms",
-        position: [121.47, 31.23],
+        region: "华东",
       },
       {
         city: "广州",
         provider: "阿里云",
         latency: "40ms",
-        position: [113.23, 23.16],
+        region: "华南",
       },
     ];
 
@@ -211,42 +204,75 @@ export default {
       selectedLocation.value = location;
     };
 
-    const initMap = async () => {
+    // 使用简单的图表代替地图
+    const initLocationChart = () => {
+      if (!mapContainer.value) return;
+
       try {
-        const AMap = await AMapLoader.load({
-          key: "您的高德地图 Key",
-          version: "2.0",
-          plugins: ["AMap.ToolBar", "AMap.Scale"],
+        const chart = echarts.init(mapContainer.value);
+        const option = {
+          backgroundColor: "transparent",
+          tooltip: {
+            trigger: "item",
+          },
+          legend: {
+            top: "5%",
+            left: "center",
+            textStyle: {
+              color: "#fff",
+            },
+          },
+          series: [
+            {
+              name: "数据中心分布",
+              type: "pie",
+              radius: ["40%", "70%"],
+              avoidLabelOverlap: false,
+              itemStyle: {
+                borderRadius: 10,
+                borderColor: "#fff",
+                borderWidth: 2,
+              },
+              label: {
+                show: true,
+                color: "#fff",
+                formatter: "{b}\n{c}个",
+              },
+              emphasis: {
+                label: {
+                  show: true,
+                  fontSize: "20",
+                  fontWeight: "bold",
+                },
+              },
+              labelLine: {
+                show: true,
+              },
+              data: [
+                { value: 2, name: "华东" },
+                { value: 1, name: "华北" },
+                { value: 1, name: "华南" },
+              ],
+            },
+          ],
+        };
+
+        chart.setOption(option);
+
+        // 添加点击事件
+        chart.on("click", (params) => {
+          const location = locations.find((loc) => loc.region === params.name);
+          if (location) {
+            selectLocation(location);
+          }
         });
-
-        map = new AMap.Map(mapContainer.value, {
-          zoom: 5,
-          center: [116.397428, 39.90923],
-          mapStyle: "amap://styles/dark",
-        });
-
-        locations.forEach((loc) => {
-          const marker = new AMap.Marker({
-            position: loc.position,
-            title: loc.city,
-          });
-
-          marker.on("click", () => {
-            selectedLocation.value = loc;
-          });
-
-          markers.push(marker);
-        });
-
-        map.add(markers);
-        mapLoaded.value = true;
-      } catch (e) {
-        console.error("地图加载失败:", e);
+      } catch (error) {
+        console.error("图表加载失败:", error);
       }
     };
 
     onMounted(() => {
-      initMap();
+      initLocationChart();
       initPyramidChart();
       initRadarChart();
       initSankeyChart();
@@ -255,14 +281,7 @@ export default {
         pyramidChart.value?.resize();
         radarChart.value?.resize();
         sankeyChart.value?.resize();
-        map?.resize();
       });
-    });
-
-    onUnmounted(() => {
-      if (map) {
-        map.destroy();
-      }
     });
 
     const initPyramidChart = () => {
@@ -397,10 +416,10 @@ export default {
     return {
       sensorData,
       selectedLocation,
-      mapContainer,
-      mapLoaded,
       locations,
       selectLocation,
+      mapContainer,
+      mapLoaded,
     };
   },
 };

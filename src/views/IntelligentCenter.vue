@@ -195,6 +195,12 @@ export default {
     const gaugeChart = ref(null);
     const networkChart = ref(null);
     const currentVideo = ref(1);
+    const analysisData = ref({
+      temperature: { current: 15, trend: "up", warning: true },
+      oxygen: { current: 0.35, trend: "stable", warning: false },
+      ph: { current: 8.3, trend: "down", warning: false },
+      salinity: { current: 0.02, trend: "stable", warning: false },
+    });
 
     const depthScores = ref([
       { depth: "0.25M", score: 85 },
@@ -203,8 +209,48 @@ export default {
       { depth: "1.0M", score: 90 },
     ]);
 
+    // 智能分析函数
+    const analyzeEnvironment = () => {
+      // 模拟智能分析逻辑
+      const analysis = [];
+      if (analysisData.value.temperature.warning) {
+        analysis.push({
+          type: "warning",
+          message: "水温异常，建议开启降温系统",
+          action: "启动降温",
+        });
+      }
+      return analysis;
+    };
+
+    // 实时数据更新
+    const updateEnvironmentData = () => {
+      // 模拟数据更新
+      const interval = setInterval(() => {
+        analysisData.value.temperature.current += (Math.random() - 0.5) * 0.1;
+        analysisData.value.oxygen.current += (Math.random() - 0.5) * 0.01;
+        analysisData.value.ph.current += (Math.random() - 0.5) * 0.05;
+        analysisData.value.salinity.current += (Math.random() - 0.5) * 0.001;
+
+        // 更新趋势
+        analysisData.value.temperature.trend =
+          analysisData.value.temperature.current > 20 ? "up" : "stable";
+
+        // 更新警告状态
+        analysisData.value.temperature.warning =
+          analysisData.value.temperature.current > 25;
+      }, 5000);
+
+      onUnmounted(() => {
+        clearInterval(interval);
+      });
+    };
+
+    // 初始化图表
     const initGaugeChart = () => {
-      const chart = echarts.init(document.querySelector(".gauge"));
+      if (!gaugeChart.value) return;
+
+      const chart = echarts.init(gaugeChart.value);
       const option = {
         series: [
           {
@@ -216,61 +262,86 @@ export default {
             splitNumber: 10,
             itemStyle: {
               color: "#58D9F9",
+              shadowColor: "rgba(0,138,255,0.45)",
+              shadowBlur: 10,
+              shadowOffsetX: 2,
+              shadowOffsetY: 2,
             },
             progress: {
               show: true,
+              roundCap: true,
               width: 18,
             },
             pointer: {
-              show: true,
+              icon: "path://M2090.36389,615.30999 L2090.36389,615.30999 C2091.48372,615.30999 2092.40383,616.194028 2092.44859,617.312956 L2096.90698,728.755929 C2097.05155,732.369577 2094.2393,735.416212 2090.62566,735.56078 C2090.53845,735.564269 2090.45117,735.566014 2090.36389,735.566014 L2090.36389,735.566014 C2086.74736,735.566014 2083.81557,732.63423 2083.81557,729.017692 C2083.81557,728.930412 2083.81732,728.84314 2083.82081,728.755929 L2088.2792,617.312956 C2088.32396,616.194028 2089.24407,615.30999 2090.36389,615.30999 Z",
               length: "75%",
+              width: 16,
+              offsetCenter: [0, "5%"],
             },
             axisLine: {
+              roundCap: true,
               lineStyle: {
                 width: 18,
-                color: [
-                  [0.3, "#FF6E76"],
-                  [0.7, "#FDDD60"],
-                  [1, "#58D9F9"],
-                ],
               },
             },
             axisTick: {
-              distance: -45,
-              splitNumber: 5,
+              splitNumber: 2,
               lineStyle: {
                 width: 2,
                 color: "#999",
               },
             },
             splitLine: {
-              distance: -52,
-              length: 14,
+              length: 12,
               lineStyle: {
                 width: 3,
                 color: "#999",
               },
             },
             axisLabel: {
-              distance: -20,
+              distance: 30,
               color: "#999",
-              fontSize: 12,
+              fontSize: 14,
+            },
+            title: {
+              show: false,
             },
             detail: {
+              backgroundColor: "#fff",
+              borderColor: "#999",
+              borderWidth: 2,
+              width: "60%",
+              lineHeight: 40,
+              height: 40,
+              borderRadius: 8,
+              offsetCenter: [0, "35%"],
               valueAnimation: true,
-              formatter: "{value}",
-              color: "#fff",
+              formatter: function (value) {
+                return "{value|" + value.toFixed(0) + "}{unit|分}";
+              },
+              rich: {
+                value: {
+                  fontSize: 30,
+                  fontWeight: "bolder",
+                  color: "#777",
+                },
+                unit: {
+                  fontSize: 14,
+                  color: "#999",
+                  padding: [0, 0, -20, 10],
+                },
+              },
             },
             data: [
               {
-                value: 70,
+                value: 85,
               },
             ],
           },
         ],
       };
+
       chart.setOption(option);
-      gaugeChart.value = chart;
     };
 
     const initNetworkChart = () => {
@@ -329,6 +400,7 @@ export default {
     onMounted(() => {
       initGaugeChart();
       initNetworkChart();
+      updateEnvironmentData();
 
       window.addEventListener("resize", () => {
         gaugeChart.value?.resize();
