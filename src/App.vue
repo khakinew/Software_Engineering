@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <nav class="navbar">
+    <nav v-if="!isLoginPage" class="navbar">
       <router-link to="/" class="nav-item">主要信息</router-link>
       <router-link to="/underwater" class="nav-item">水下系统</router-link>
       <router-link to="/intelligent" class="nav-item">智能中心</router-link>
@@ -9,8 +9,8 @@
       >
       <div class="auth-section">
         <template v-if="isLoggedIn">
-          <span>{{ user ? user.username : "" }}</span>
-          <button @click="handleLogout">退出</button>
+          <span class="username">{{ user ? user.username : "" }}</span>
+          <button @click="handleLogout" class="logout-btn">退出</button>
         </template>
         <template v-else>
           <button @click="showLoginModal = true">登录</button>
@@ -40,13 +40,14 @@
 <script>
 import { computed, reactive, ref } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 export default {
   name: "App",
   setup() {
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
     const showLoginModal = ref(false);
     const loginForm = reactive({
       username: "",
@@ -56,6 +57,7 @@ export default {
     const user = computed(() => store.state.user);
     const isAdmin = computed(() => store.getters.isAdmin);
     const isLoggedIn = computed(() => store.getters.isLoggedIn);
+    const isLoginPage = computed(() => route.path === "/login");
 
     const handleLogin = async () => {
       try {
@@ -69,10 +71,8 @@ export default {
     };
 
     const handleLogout = () => {
-      store.commit("logout");
-      if (router.currentRoute.value.meta.requiresAdmin) {
-        router.push("/");
-      }
+      store.dispatch("logout");
+      router.push("/login");
     };
 
     return {
@@ -81,6 +81,7 @@ export default {
       user,
       isAdmin,
       isLoggedIn,
+      isLoginPage,
       handleLogin,
       handleLogout,
     };
@@ -115,14 +116,27 @@ export default {
 
 .auth-section {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
-.auth-section button {
-  margin-left: 1rem;
-  padding: 0.5rem 1rem;
+.username {
+  color: white;
+  font-weight: 500;
+}
+
+.logout-btn {
+  background-color: #e74c3c !important;
+  color: white;
   border: none;
+  padding: 0.5rem 1rem;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.logout-btn:hover {
+  background-color: #c0392b !important;
 }
 
 .modal {
