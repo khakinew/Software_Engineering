@@ -14,32 +14,17 @@
           <button @click="handleLogout" class="logout-btn">退出</button>
         </template>
         <template v-else>
-          <button @click="showLoginModal = true">登录</button>
+          <button @click="goToLogin" class="login-btn">登录</button>
         </template>
       </div>
     </nav>
-
-    <!-- 登录模态框 -->
-    <div v-if="showLoginModal" class="modal">
-      <div class="modal-content">
-        <h2>登录</h2>
-        <input v-model="loginForm.username" placeholder="用户名" />
-        <input
-          v-model="loginForm.password"
-          type="password"
-          placeholder="密码"
-        />
-        <button @click="handleLogin">登录</button>
-        <button @click="showLoginModal = false">取消</button>
-      </div>
-    </div>
 
     <router-view />
   </div>
 </template>
 
 <script>
-import { computed, reactive, ref } from "vue";
+import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 
@@ -49,42 +34,33 @@ export default {
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const showLoginModal = ref(false);
-    const loginForm = reactive({
-      username: "",
-      password: "",
-    });
 
     const user = computed(() => store.state.user);
     const isAdmin = computed(() => store.getters.isAdmin);
     const isLoggedIn = computed(() => store.getters.isLoggedIn);
     const isLoginPage = computed(() => route.path === "/login");
 
-    const handleLogin = async () => {
+    const handleLogout = async () => {
       try {
-        await store.dispatch("login", loginForm);
-        showLoginModal.value = false;
-        loginForm.username = "";
-        loginForm.password = "";
+        await store.dispatch("logout");
+        router.push("/login");
       } catch (error) {
-        console.error("登录失败:", error);
+        console.error("退出登录失败:", error);
+        router.push("/login");
       }
     };
 
-    const handleLogout = () => {
-      store.dispatch("logout");
+    const goToLogin = () => {
       router.push("/login");
     };
 
     return {
-      showLoginModal,
-      loginForm,
       user,
       isAdmin,
       isLoggedIn,
       isLoginPage,
-      handleLogin,
       handleLogout,
+      goToLogin,
     };
   },
 };
@@ -140,34 +116,7 @@ export default {
   background-color: #c0392b !important;
 }
 
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.modal-content {
-  background-color: white;
-  padding: 2rem;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-input {
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-button {
+.login-btn {
   background-color: #42b983;
   color: white;
   border: none;
@@ -176,7 +125,7 @@ button {
   cursor: pointer;
 }
 
-button:hover {
+.login-btn:hover {
   background-color: #3aa876;
 }
 </style>

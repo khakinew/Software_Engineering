@@ -1,4 +1,5 @@
 import { createStore } from "vuex";
+import { authApi } from "../api/auth";
 
 const users = {
   admin: { username: "admin", password: "admin123", role: "admin" },
@@ -31,39 +32,56 @@ export default createStore({
   },
   actions: {
     async login({ commit }, { username, password, rememberMe }) {
-      // 验证用户
-      const user = Object.values(users).find(
-        (u) => u.username === username && u.password === password
-      );
+      try {
+        const response = await authApi.login(username, password);
+        if (response.success) {
+          const userData = response.user;
 
-      if (user) {
-        const userData = {
-          username: user.username,
-          role: user.role,
-        };
+          if (rememberMe) {
+            localStorage.setItem("user", JSON.stringify(userData));
+            localStorage.setItem("isAuthenticated", "true");
+          } else {
+            sessionStorage.setItem("user", JSON.stringify(userData));
+            sessionStorage.setItem("isAuthenticated", "true");
+          }
 
-        if (rememberMe) {
-          localStorage.setItem("user", JSON.stringify(userData));
-          localStorage.setItem("isAuthenticated", "true");
-        } else {
-          sessionStorage.setItem("user", JSON.stringify(userData));
-          sessionStorage.setItem("isAuthenticated", "true");
+          commit("SET_USER", userData);
+          commit("SET_AUTH", true);
+          return response;
         }
-
-        commit("SET_USER", userData);
-        commit("SET_AUTH", true);
-      } else {
-        throw new Error("用户名或密码错误");
+        throw new Error(response.message || "登录失败");
+      } catch (error) {
+        throw error;
       }
     },
-    logout({ commit }) {
-      // 清除所有存储
-      localStorage.removeItem("user");
-      localStorage.removeItem("isAuthenticated");
-      sessionStorage.removeItem("user");
-      sessionStorage.removeItem("isAuthenticated");
-      commit("CLEAR_AUTH");
+
+    async register({ commit }, { username, password, repassword }) {
+      try {
+        const response = await authApi.register(username, password, repassword);
+        if (response.success) {
+          return response;
+        }
+        throw new Error(response.message || "注册失败");
+      } catch (error) {
+        throw error;
+      }
     },
+
+    async logout({ commit }) {
+      try {
+        await authApi.logout();
+      } catch (error) {
+        console.error("退出登录失败:", error);
+      } finally {
+        // 无论退出是否成功，都清除本地状态
+        localStorage.removeItem("user");
+        localStorage.removeItem("isAuthenticated");
+        sessionStorage.removeItem("user");
+        sessionStorage.removeItem("isAuthenticated");
+        commit("CLEAR_AUTH");
+      }
+    },
+
     checkAuth({ commit }) {
       // 先检查 sessionStorage（当前会话）
       let isAuthenticated =

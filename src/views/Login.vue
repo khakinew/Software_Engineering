@@ -1,30 +1,33 @@
 <template>
   <div class="login-container">
     <div class="login-box">
-      <h2>登录</h2>
+      <h2>{{ isRegister ? "注册" : "登录" }}</h2>
+
+      <!-- 用户类型选择 -->
       <div class="user-type-selector">
         <button
-          :class="['type-btn', { active: loginType === 'user' }]"
-          @click="loginType = 'user'"
+          :class="['type-btn', { active: userType === 'user' }]"
+          @click="userType = 'user'"
         >
           普通用户
         </button>
         <button
-          :class="['type-btn', { active: loginType === 'admin' }]"
-          @click="loginType = 'admin'"
+          :class="['type-btn', { active: userType === 'admin' }]"
+          @click="userType = 'admin'"
         >
           管理员
         </button>
       </div>
-      <form @submit.prevent="handleLogin">
+
+      <form @submit.prevent="handleSubmit">
         <div class="form-group">
           <label for="username">用户名</label>
           <input
             type="text"
             id="username"
-            v-model="username"
+            v-model="form.username"
             required
-            :placeholder="loginType === 'admin' ? 'admin' : 'user'"
+            :placeholder="userType === 'admin' ? 'admin' : '请输入用户名'"
           />
         </div>
         <div class="form-group">
@@ -32,32 +35,48 @@
           <input
             type="password"
             id="password"
-            v-model="password"
+            v-model="form.password"
             required
-            :placeholder="loginType === 'admin' ? 'admin123' : 'user123'"
+            :placeholder="userType === 'admin' ? 'admin123' : '请输入密码'"
           />
         </div>
-        <div class="form-group checkbox-group">
+        <div class="form-group" v-if="isRegister">
+          <label for="repassword">确认密码</label>
+          <input
+            type="password"
+            id="repassword"
+            v-model="form.repassword"
+            required
+            placeholder="请再次输入密码"
+          />
+        </div>
+        <div v-if="!isRegister" class="form-group checkbox-group">
           <label class="checkbox-label">
-            <input type="checkbox" v-model="rememberMe" />
+            <input type="checkbox" v-model="form.rememberMe" />
             <span>记住登录状态</span>
           </label>
         </div>
-        <div class="login-tips">
-          提示：{{
-            loginType === "admin"
-              ? "管理员账号：admin / admin123"
-              : "用户账号：user / user123"
-          }}
+        <div v-if="errorMessage" class="error-message">
+          {{ errorMessage }}
         </div>
-        <button type="submit" class="login-btn">登录</button>
+        <div class="login-tips" v-if="!isRegister && userType === 'admin'">
+          提示：管理员账号：admin / admin123
+        </div>
+        <button type="submit" class="submit-btn">
+          {{ isRegister ? "注册" : "登录" }}
+        </button>
       </form>
+      <div class="switch-mode">
+        <a href="#" @click.prevent="toggleMode">
+          {{ isRegister ? "已有账号？去登录" : "没有账号？去注册" }}
+        </a>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref } from "vue";
+import { ref, reactive } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -66,30 +85,68 @@ export default {
   setup() {
     const router = useRouter();
     const store = useStore();
-    const username = ref("");
-    const password = ref("");
-    const rememberMe = ref(false);
-    const loginType = ref("user");
+    const isRegister = ref(false);
+    const errorMessage = ref("");
+    const userType = ref("user");
 
-    const handleLogin = async () => {
+    const form = reactive({
+      username: "",
+      password: "",
+      repassword: "",
+      rememberMe: false,
+    });
+
+    const handleSubmit = async () => {
       try {
-        await store.dispatch("login", {
-          username: username.value,
-          password: password.value,
-          rememberMe: rememberMe.value,
-        });
+        errorMessage.value = "";
+
+        if (isRegister.value) {
+          // 注册流程
+          await store.dispatch("register", {
+            username: form.username,
+            password: form.password,
+            repassword: form.repassword,
+            role: userType.value,
+          });
+
+          // 注册成功后自动登录
+          await store.dispatch("login", {
+            username: form.username,
+            password: form.password,
+            rememberMe: true,
+          });
+        } else {
+          // 登录流程
+          await store.dispatch("login", {
+            username: form.username,
+            password: form.password,
+            rememberMe: form.rememberMe,
+          });
+        }
+
         router.push("/");
       } catch (error) {
-        alert("登录失败：" + error.message);
+        errorMessage.value = error.message;
       }
     };
 
+    const toggleMode = () => {
+      isRegister.value = !isRegister.value;
+      errorMessage.value = "";
+      form.username = "";
+      form.password = "";
+      form.repassword = "";
+      form.rememberMe = false;
+      userType.value = "user";
+    };
+
     return {
-      username,
-      password,
-      rememberMe,
-      loginType,
-      handleLogin,
+      form,
+      isRegister,
+      errorMessage,
+      userType,
+      handleSubmit,
+      toggleMode,
     };
   },
 };
@@ -102,12 +159,6 @@ export default {
   align-items: center;
   min-height: 100vh;
   background-color: #f5f5f5;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1000;
 }
 
 .login-box {
@@ -123,7 +174,6 @@ export default {
   display: flex;
   gap: 1rem;
   margin-bottom: 2rem;
-  justify-content: center;
 }
 
 .type-btn {
@@ -161,10 +211,15 @@ label {
 
 input {
   width: 100%;
-  padding: 0.5rem;
+  padding: 0.75rem;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 1rem;
+}
+
+input:focus {
+  border-color: #42b983;
+  outline: none;
 }
 
 .checkbox-group {
@@ -182,26 +237,46 @@ input {
   margin-right: 8px;
 }
 
-.login-tips {
+.error-message {
+  color: #e74c3c;
+  margin: 1rem 0;
   font-size: 0.9rem;
+}
+
+.login-tips {
   color: #666;
-  margin-bottom: 1rem;
+  margin: 1rem 0;
+  font-size: 0.9rem;
   text-align: center;
 }
 
-.login-btn {
+.submit-btn {
   width: 100%;
   padding: 0.75rem;
-  background-color: #4caf50;
+  background-color: #42b983;
   color: white;
   border: none;
   border-radius: 4px;
   font-size: 1rem;
   cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.submit-btn:hover {
+  background-color: #3aa876;
+}
+
+.switch-mode {
+  text-align: center;
   margin-top: 1rem;
 }
 
-.login-btn:hover {
-  background-color: #45a049;
+.switch-mode a {
+  color: #42b983;
+  text-decoration: none;
+}
+
+.switch-mode a:hover {
+  text-decoration: underline;
 }
 </style>

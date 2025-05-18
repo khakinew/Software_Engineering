@@ -9,16 +9,20 @@ import store from "../store";
 
 const routes = [
   {
+    path: "/",
+    redirect: "/home",
+  },
+  {
+    path: "/home",
+    name: "Home",
+    component: Home,
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/login",
     name: "Login",
     component: Login,
     meta: { requiresAuth: false },
-  },
-  {
-    path: "/",
-    name: "Home",
-    component: Home,
-    meta: { requiresAuth: true },
   },
   {
     path: "/underwater",
@@ -57,6 +61,16 @@ router.beforeEach(async (to, from, next) => {
   const isAuthenticated = store.getters.isAuthenticated;
   const user = store.getters.user;
 
+  // 如果是登录页面
+  if (to.path === "/login") {
+    if (isAuthenticated) {
+      next("/home");
+    } else {
+      next();
+    }
+    return;
+  }
+
   // 如果需要认证但未登录，重定向到登录页
   if (to.meta.requiresAuth && !isAuthenticated) {
     next("/login");
@@ -65,13 +79,7 @@ router.beforeEach(async (to, from, next) => {
 
   // 如果需要管理员权限
   if (to.meta.requiresAdmin && (!user || user.role !== "admin")) {
-    next("/");
-    return;
-  }
-
-  // 如果已登录且访问登录页，重定向到首页
-  if (to.path === "/login" && isAuthenticated) {
-    next("/");
+    next("/home");
     return;
   }
 
