@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>智慧海洋牧场</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('main.index') }}">主页</a>
+        <a href="{{ url_for('main.underwater') }}">水下系统</a>
+        <a href="{{ url_for('main.smart_center') }}">智能中心</a>
+        {% if current_user.role == 'admin' %}
+            <a href="{{ url_for('admin.dashboard') }}">管理界面</a>
+        {% endif %}
+    </nav>
+    {% block content %}{% endblock %}
+</body>
+</html>
