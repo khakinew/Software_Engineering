@@ -7,13 +7,13 @@
       <div class="user-type-selector">
         <button
           :class="['type-btn', { active: userType === 'user' }]"
-          @click="userType = 'user'"
+          @click="switchToUser"
         >
           普通用户
         </button>
         <button
           :class="['type-btn', { active: userType === 'admin' }]"
-          @click="userType = 'admin'"
+          @click="switchToAdmin"
         >
           管理员
         </button>
@@ -40,7 +40,7 @@
             :placeholder="userType === 'admin' ? 'admin123' : '请输入密码'"
           />
         </div>
-        <div class="form-group" v-if="isRegister">
+        <div class="form-group" v-if="isRegister && userType === 'user'">
           <label for="repassword">确认密码</label>
           <input
             type="password"
@@ -59,14 +59,14 @@
         <div v-if="errorMessage" class="error-message">
           {{ errorMessage }}
         </div>
-        <div class="login-tips" v-if="!isRegister && userType === 'admin'">
+        <div class="login-tips" v-if="userType === 'admin'">
           提示：管理员账号：admin / admin123
         </div>
         <button type="submit" class="submit-btn">
           {{ isRegister ? "注册" : "登录" }}
         </button>
       </form>
-      <div class="switch-mode">
+      <div class="switch-mode" v-if="userType === 'user'">
         <a href="#" @click.prevent="toggleMode">
           {{ isRegister ? "已有账号？去登录" : "没有账号？去注册" }}
         </a>
@@ -100,13 +100,13 @@ export default {
       try {
         errorMessage.value = "";
 
-        if (isRegister.value) {
+        if (isRegister.value && userType.value === "user") {
           // 注册流程
           await store.dispatch("register", {
             username: form.username,
             password: form.password,
             repassword: form.repassword,
-            role: userType.value,
+            role: "user",
           });
 
           // 注册成功后自动登录
@@ -130,14 +130,31 @@ export default {
       }
     };
 
-    const toggleMode = () => {
-      isRegister.value = !isRegister.value;
+    const switchToAdmin = () => {
+      userType.value = "admin";
+      isRegister.value = false;
+      form.username = "admin";
+      form.password = "admin123";
       errorMessage.value = "";
+    };
+
+    const switchToUser = () => {
+      userType.value = "user";
       form.username = "";
       form.password = "";
       form.repassword = "";
-      form.rememberMe = false;
-      userType.value = "user";
+      errorMessage.value = "";
+    };
+
+    const toggleMode = () => {
+      if (userType.value === "user") {
+        isRegister.value = !isRegister.value;
+        form.username = "";
+        form.password = "";
+        form.repassword = "";
+        form.rememberMe = false;
+        errorMessage.value = "";
+      }
     };
 
     return {
@@ -147,6 +164,8 @@ export default {
       userType,
       handleSubmit,
       toggleMode,
+      switchToAdmin,
+      switchToUser,
     };
   },
 };

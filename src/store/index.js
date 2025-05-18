@@ -1,9 +1,11 @@
 import { createStore } from "vuex";
 import { authApi } from "../api/auth";
 
-const users = {
-  admin: { username: "admin", password: "admin123", role: "admin" },
-  user: { username: "user", password: "user123", role: "user" },
+// 默认管理员账号
+const ADMIN_CREDENTIALS = {
+  username: "admin",
+  password: "admin123",
+  role: "admin",
 };
 
 export default createStore({
@@ -33,6 +35,30 @@ export default createStore({
   actions: {
     async login({ commit }, { username, password, rememberMe }) {
       try {
+        // 检查是否是管理员默认账号
+        if (
+          username === ADMIN_CREDENTIALS.username &&
+          password === ADMIN_CREDENTIALS.password
+        ) {
+          const adminData = {
+            username: ADMIN_CREDENTIALS.username,
+            role: ADMIN_CREDENTIALS.role,
+          };
+
+          if (rememberMe) {
+            localStorage.setItem("user", JSON.stringify(adminData));
+            localStorage.setItem("isAuthenticated", "true");
+          } else {
+            sessionStorage.setItem("user", JSON.stringify(adminData));
+            sessionStorage.setItem("isAuthenticated", "true");
+          }
+
+          commit("SET_USER", adminData);
+          commit("SET_AUTH", true);
+          return { success: true, user: adminData };
+        }
+
+        // 非管理员账号，使用后端 API
         const response = await authApi.login(username, password);
         if (response.success) {
           const userData = response.user;
@@ -57,6 +83,11 @@ export default createStore({
 
     async register({ commit }, { username, password, repassword }) {
       try {
+        // 禁止注册管理员账号
+        if (username === ADMIN_CREDENTIALS.username) {
+          throw new Error("不能使用保留的用户名");
+        }
+
         const response = await authApi.register(username, password, repassword);
         if (response.success) {
           return response;
