@@ -1,0 +1,5 @@
+
+flask-migrate==4.0.5
+python-dotenv==0.21.1
+marshmallow==3.19.0
+python-dateutil==2.9.0
