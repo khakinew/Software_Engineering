@@ -6,7 +6,7 @@ import Admin from "../views/Admin.vue";
 import Login from "../views/Login.vue";
 import DataCenter from "../views/DataCenter.vue";
 import store from "../store";
-
+import { auth } from "@/api/auth";
 const routes = [
   {
     path: "/",
@@ -56,7 +56,7 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to, from, next) => {
-  // 检查认证状态
+
   await store.dispatch("checkAuth");
   const isAuthenticated = store.getters.isAuthenticated;
   const user = store.getters.user;
@@ -66,6 +66,7 @@ router.beforeEach(async (to, from, next) => {
     if (isAuthenticated) {
       next("/home");
     } else {
+
       next();
     }
     return;
@@ -73,12 +74,15 @@ router.beforeEach(async (to, from, next) => {
 
   // 如果需要认证但未登录，重定向到登录页
   if (to.meta.requiresAuth && !isAuthenticated) {
+    console.log("普通用户");
     next("/login");
     return;
   }
 
   // 如果需要管理员权限
   if (to.meta.requiresAdmin && (!user || user.role !== "admin")) {
+
+    
     next("/home");
     return;
   }
