@@ -1,6 +1,5 @@
 <template>
   <div class="home">
-    <AlertBanner />
     <!-- 左侧视频区域 -->
     <div class="section video-section">
       <div class="section-header">
@@ -21,7 +20,8 @@
         <div class="video-player">
           <video
               class="video-stream"
-              src="/videos/shiping.mp4"
+              :src="currentVideoSrc"
+              type="video/mp4"
               controls
               autoplay
               muted
@@ -112,20 +112,22 @@
         <div class="history-container">
           <div class="history-controls">
             <button
-              v-for="period in ['近一天', '近一周', '近一月', '近一年']"
-              :key="period"
-              :class="['period-btn', { active: currentPeriod === period }]"
-              @click="currentPeriod = period"
+            v-for="period in ['近一天', '近一周', '近一月', '近一年']"
+  :key="period"
+  :class="['period-btn', { active: currentPeriod === period }]"
+  @click="onPeriodClick(period)"
             >
               {{ period }}
             </button>
             <select v-model="selectedMetric">
-              <option value="电池电压">电池电压</option>
+              <option value="电导率">电导率</option>
               <option value="水温">水温</option>
-              <option value="盐度">盐度</option>
+              <option value="ph">ph值</option>
             </select>
           </div>
-          <div class="chart-container" ref="chartContainer"></div>
+          <div class="chart-container" ref="chartContainer" @dblclick="handleDownloadChart">
+            <div class="chart-hint">点击图表下载</div>
+          </div>
         </div>
       </div>
 
@@ -168,21 +170,25 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import * as echarts from "echarts";
-import AMapLoader from '@amap/amap-jsapi-loader';
-import AlertBanner from '../components/AlertBanner.vue';
-
+import AMapLoader from '@amap/amap-jsapi-loader'
+import { downloadEChart } from "@/utils/echart";
+import {getEchartData} from "@/api/auth"
+import { debounce } from 'lodash';
 
 export default {
-  components: {
-    AlertBanner
+  computed: {
+    currentVideoSrc() {
+      return `/videos/shiping_${this.currentVideo}.mp4`;
+    },
   },
   name: "Home",
   setup() {
     const currentVideo = ref(1);
     const currentPeriod = ref("近一天");
-    const selectedMetric = ref("电池电压");
+    const selectedMetric = ref("电导率");
+    const chartContainerMap = ref(null);
     const controls = ref({
       camera: true,
       light: true,
@@ -196,7 +202,13 @@ export default {
       }月${date.getDate()}日`;
     });
 
-    const currentTime = ref("");
+    const currentTime = computed(() => {
+      const date = new Date();
+      return `${date.getHours().toString().padStart(2, "0")}:${date
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}`;
+    });
 
     const waterData = ref([
       {
@@ -248,21 +260,33 @@ export default {
           .catch((e)=>{
             console.error("高德地图加载失败：",e);
           });
-      initChart();
+      initChart("day").then(() => {});
       // 更新当前时间
       setInterval(() => {
-        const date = new Date();
-        currentTime.value = `${date.getHours().toString().padStart(2, "0")}:${date
-          .getMinutes()
-          .toString()
-          .padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}`;
+        currentTime.value = new Date().toLocaleTimeString();
       }, 1000);
     });
 
-    const initChart = () => {
-      const chartDom = document.querySelector(".chart-container");
-      chart = echarts.init(chartDom);
+    watch(selectedMetric, () => {
+      const periodType = periodMap[currentPeriod.value];
+      initChart(periodType);
+    });
 
+    const initChart =async (timeStr) => {
+      const metricMap = {
+        "电导率": "conductivity",
+        "水温": "temperature",
+        "ph值": "ph"
+      };
+      const metricKey = metricMap[selectedMetric.value];
+      const res = await getEchartData(timeStr, "", metricKey); // "" 为 site 名占位符，如有需要后续可加
+
+      const resData=res.data
+
+      const chartDom = document.querySelector(".chart-container");
+
+      chart = echarts.init(chartDom);
+      chartContainerMap.value = chart;
       const option = {
         grid: {
           top: 40,
@@ -270,16 +294,26 @@ export default {
           bottom: 40,
           left: 60,
         },
+        tooltip: { trigger: "axis" },
+        title: {
+          text: selectedMetric.value + '变化趋势',
+          textStyle: {
+            color: '#ffffff'
+          }
+        },
         xAxis: {
           type: "category",
-          data: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00"],
+          data: resData.x,
           axisLine: {
             lineStyle: {
               color: "#ffffff",
+              show: true, // 确保显示标签
+              fontSize: 12
             },
           },
           axisLabel: {
             color: "#ffffff",
+            show: true // 确保显示轴线
           },
         },
         yAxis: {
@@ -287,10 +321,13 @@ export default {
           axisLine: {
             lineStyle: {
               color: "#ffffff",
+              show: true, // 确保显示标签
+              fontSize: 12
             },
           },
           axisLabel: {
             color: "#ffffff",
+            show: true // 确保显示轴线
           },
           splitLine: {
             lineStyle: {
@@ -300,7 +337,7 @@ export default {
         },
         series: [
           {
-            data: [25, 24, 26, 27, 25, 24, 25],
+            data:resData.y,
             type: "line",
             smooth: true,
             lineStyle: {
@@ -331,17 +368,39 @@ export default {
 
       chart.setOption(option);
     };
+    const handleDownloadChart = () => {
+      downloadEChart(chartContainerMap.value, "chart.png");
+    };
 
+
+// 后端映射（比如你接口需要 day/week/month/year）
+const periodMap = {
+  '近一天': 'day',
+  '近一周': 'week',
+  '近一月': 'month',
+  '近一年': 'year',
+};
+
+const onPeriodClick = debounce((period) => {
+  currentPeriod.value = period;
+  const periodType = periodMap[period];
+  initChart(periodType); // 比如调用接口或更新图表
+}, 500); // 500 毫秒内只触发一次
     return {
       currentVideo,
       currentPeriod,
       selectedMetric,
+      getEchartData,
       controls,
       waterData,
       videoSource,
       mapSource,
       currentDate,
       currentTime,
+      chartContainerMap,
+      downloadEChart,
+      handleDownloadChart,
+      onPeriodClick
     };
   },
 };
@@ -541,6 +600,8 @@ export default {
   background-color: rgba(0, 0, 0, 0.2);
   border-radius: 4px;
 }
+
+
 
 .device-info {
   display: grid;
