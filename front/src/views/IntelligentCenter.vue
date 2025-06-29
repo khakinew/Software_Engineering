@@ -28,7 +28,11 @@
       </div>
       <div class="network-panel">
         <h3 class="panel-title">网衰监测</h3>
-        <div class="province-chart" ref="networkChart" @dblclick="handleNetloadChart"></div>
+        <div
+          class="province-chart"
+          ref="networkChart"
+          @dblclick="handleNetloadChart"
+        ></div>
         <div class="network-info">
           <div class="info-date">网衰破损（2024-02-01）</div>
         </div>
@@ -134,7 +138,11 @@
       <div class="ai-stats">
         <div class="ai-logo">
           <h3 class="panel-title">AI决策</h3>
-          <a href="https://chat.openai.com/" target="_blank" title="点击和GPT对话">
+          <a
+            href="https://chat.openai.com/"
+            target="_blank"
+            title="点击和GPT对话"
+          >
             <img src="/images/AI.png" alt="AI决策" />
           </a>
         </div>
@@ -189,6 +197,9 @@
         </div>
       </div>
     </div>
+    <a href="localhost:2222" target="_blank" class="floating-button">
+      和智能助手聊天吧！
+    </a>
   </div>
 </template>
 
@@ -199,13 +210,13 @@ import axios from "axios";
 import { downloadEChart } from "@/utils/echart";
 
 export default {
-  data(){
-    return{
-      currentVideo:1,
+  data() {
+    return {
+      currentVideo: 1,
     };
   },
-  computed:{
-    currentVideoSrc(){
+  computed: {
+    currentVideoSrc() {
       return `/videos/zhineng_${this.currentVideo}.mp4`;
     },
     leftEyeSrc() {
@@ -213,16 +224,16 @@ export default {
     },
     rightEyeSrc() {
       return `/videos/shiping_${this.currentVideo}.mp4`;
-    }
+    },
   },
-  methods:{
-    switchVideo(n){
+  methods: {
+    switchVideo(n) {
       this.currentVideo = n;
       const videoEl = this.$refs.mainVideo;
-      if(videoE1){
+      if (videoE1) {
         videoE1.load();
       }
-    }
+    },
   },
   name: "IntelligentCenter",
   setup() {
@@ -280,45 +291,46 @@ export default {
       });
     };
     const weather = ref({
-      temperature: '--',
-      wind: '--',
-      humidity: '--',
-      reporttime: '--',
-      city: '--',
-      source: '高德地图气象中心',
-    })
+      temperature: "--",
+      wind: "--",
+      humidity: "--",
+      reporttime: "--",
+      city: "--",
+      source: "高德地图气象中心",
+    });
 
     const getWeather = async () => {
       try {
-        const key = 'cf66b80cc13dbeae7fcbbcc2c001af66'
-        const cityCode = '120000'
-        const res = await axios.get('https://restapi.amap.com/v3/weather/weatherInfo', {
-          params: {
-            key,
-            city: cityCode,
-            extensions: 'base',
-          },
-        })
+        const key = "cf66b80cc13dbeae7fcbbcc2c001af66";
+        const cityCode = "120000";
+        const res = await axios.get(
+          "https://restapi.amap.com/v3/weather/weatherInfo",
+          {
+            params: {
+              key,
+              city: cityCode,
+              extensions: "base",
+            },
+          }
+        );
 
-        console.log('天气数据返回：', res.data)
+        console.log("天气数据返回：", res.data);
 
-
-
-        if (res.data.status === '1' ) {
-          const data = res.data.lives[0]
+        if (res.data.status === "1") {
+          const data = res.data.lives[0];
           weather.value = {
-            temperature: data.temperature + '°C',
-            wind: data.winddirection +'风' + data.windpower+'级',
-            humidity: data.humidity + '%',
+            temperature: data.temperature + "°C",
+            wind: data.winddirection + "风" + data.windpower + "级",
+            humidity: data.humidity + "%",
             reporttime: data.reporttime,
             city: data.city,
-            source: '高德地图气象中心',
-          }
+            source: "高德地图气象中心",
+          };
         }
       } catch (err) {
-        console.error('天气获取失败：', err)
+        console.error("天气获取失败：", err);
       }
-    }
+    };
 
     // 初始化图表
     const initGaugeChart = () => {
@@ -475,7 +487,6 @@ export default {
       }
     };
 
-
     const switchVideo = (n) => {
       currentVideo.value = n;
     };
@@ -530,12 +541,12 @@ export default {
 }
 
 .left-panel,
-.center-panel{
+.center-panel {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
-.right-panel{
+.right-panel {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -564,7 +575,6 @@ export default {
   height: auto;
   object-fit: contain;
 }
-
 
 .score-panel,
 .network-panel,
@@ -627,7 +637,7 @@ export default {
   margin-bottom: 20px;
 }
 
-.main-video{
+.main-video {
   position: relative;
   width: 100%;
   height: 400px;
@@ -833,5 +843,29 @@ export default {
 .alert-source {
   font-size: 12px;
   color: #90caf9;
+}
+
+.floating-button {
+  position: fixed;
+  right: 30px;
+  bottom: 30px;
+  width: 60px;
+  height: 60px;
+  background-color: #4caf50;
+  color: white;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 60px;
+  font-size: 24px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  text-decoration: none;
+  transition: all 0.3s;
+}
+
+.floating-button:hover {
+  background-color: #45a049;
+  transform: scale(1.1);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
 }
 </style>
