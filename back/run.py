@@ -22,8 +22,6 @@ db.init_app(app)
 login_manager.init_app(app)
 register_error_handlers(app)
 app.register_blueprint(api)
-from api.alerts import alerts
-app.register_blueprint(alerts)
 @app.route('/', methods=['GET', 'POST'])
 @login_required
 def index():
@@ -581,6 +579,133 @@ def get_province_site_count():
             "message": "获取不同省份的站点数量失败",
             "error": str(e)
         }), 500
+
+from datetime import datetime, timedelta
+
+from sqlalchemy import func, cast, Integer, and_
+def combine_date_time(date_col, time_col):
+    return func.datetime(func.strftime('%Y-%m-%d', date_col) + ' ' + func.strftime('%H:%M:%S', time_col))
+
+@app.route('/get-axis')
+def get_conductivity():
+    range_type = request.args.get('range', 'day')
+    metric = request.args.get('metric', 'ph')
+    base_date = datetime(2021, 4, 5)
+
+
+    if metric not in ['conductivity', 'temperature', 'ph']:
+        return jsonify({"error": "Invalid metric"}), 400
+
+    metric_field = getattr(MonitorData, metric)
+
+    dt_col = combine_date_time(MonitorData.monitor_date, MonitorData.monitor_time)
+
+    if range_type == "day":
+        start = base_date
+        end = start + timedelta(days=1)
+
+        dt_col = func.datetime(
+            func.strftime('%Y-%m-%d', MonitorData.monitor_date) + ' ' + func.strftime('%H:%M:%S', MonitorData.monitor_time)
+        )
+
+        records = (
+            db.session.query(
+                (func.strftime('%H', dt_col).cast(db.Integer) / 4).label("hour_group"),
+                func.avg(metric_field).label("avg_value")
+            )
+            .filter(and_(dt_col >= start, dt_col < end))
+            .group_by("hour_group")
+            .order_by("hour_group")
+            .all()
+        )
+
+        x_labels = ["0:00", "4:00", "8:00", "12:00", "16:00", "20:00", "24:00"]
+        y_values = [None] * len(x_labels)
+
+        for rec in records:
+            idx = int(rec.hour_group)
+            if 0 <= idx < 6:
+                y_values[idx] = round(rec.avg_value, 2) if rec.avg_value else None
+
+    elif range_type == "week":
+        start = base_date - timedelta(days=6)
+        end = base_date + timedelta(days=1)
+
+        records = (
+            db.session.query(
+                func.strftime('%Y-%m-%d', dt_col).label('day'),
+                func.avg(metric_field).label('avg_value')
+            )
+            .filter(and_(dt_col >= start, dt_col < end))
+            .group_by('day')
+            .order_by('day')
+            .all()
+        )
+
+        x_labels = [(start + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+        y_map = {rec.day: round(rec.avg_value, 2) for rec in records}
+        y_values = [y_map.get(day, None) for day in x_labels]
+
+    elif range_type == "month":
+        start = base_date
+        end = start + timedelta(days=28)
+
+        dt_col = func.datetime(
+            func.strftime('%Y-%m-%d', MonitorData.monitor_date) + ' ' + func.strftime('%H:%M:%S', MonitorData.monitor_time)
+        )
+
+        records = (
+            db.session.query(
+                ((func.julianday(dt_col) - func.julianday(start)) / 7).label("week_group"),
+                func.avg(metric_field).label("avg_value")
+            )
+            .filter(and_(dt_col >= start, dt_col < end))
+            .group_by("week_group")
+            .order_by("week_group")
+            .all()
+        )
+
+        x_labels = [(start + timedelta(days=7 * i + 6)).strftime("%Y-%m-%d") for i in range(4)]
+        y_values = [None] * 4
+        for rec in records:
+            idx = int(rec.week_group)
+            if 0 <= idx < 4:
+                y_values[idx] = round(rec.avg_value, 2) if rec.avg_value else None
+
+    elif range_type == "year":
+        start = base_date.replace(year=base_date.year - 1)
+        end = base_date + timedelta(days=1)
+
+        records = (
+            db.session.query(
+                func.strftime('%Y-%m', dt_col).label('month'),
+                func.avg(metric_field).label('avg_value')
+            )
+            .filter(and_(dt_col >= start, dt_col < end))
+            .group_by('month')
+            .order_by('month')
+            .all()
+        )
+
+        x_labels = []
+        y_values = []
+        cursor = start
+        while cursor < end:
+            month_str = cursor.strftime('%Y-%m')
+            x_labels.append(month_str)
+            y_values.append(None)
+            cursor += timedelta(days=32)
+            cursor = cursor.replace(day=1)
+
+        y_map = {rec.month: round(rec.avg_value, 2) for rec in records}
+        y_values = [y_map.get(month, None) for month in x_labels]
+
+    else:
+        return jsonify({"error": "Invalid range"}), 400
+
+    return jsonify({"x": x_labels, "y": y_values})
+
+
 
 if __name__ == '__main__':
     with app.app_context():
