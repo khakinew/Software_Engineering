@@ -1,5 +1,6 @@
 <template>
   <div id="app">
+    <alert-banner />
     <nav v-if="!isLoginPage" class="navbar">
       <router-link to="/" class="nav-item">主要信息</router-link>
       <router-link to="/underwater" class="nav-item">水下系统</router-link>
@@ -27,9 +28,13 @@
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
+import AlertBanner from "@/components/AlertBanner.vue";
 
 export default {
   name: "App",
+  components: {
+    AlertBanner,
+  },
   setup() {
     const store = useStore();
     const router = useRouter();
