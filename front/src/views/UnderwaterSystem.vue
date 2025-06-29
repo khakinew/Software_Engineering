@@ -10,89 +10,74 @@
           <div class="section-header">
             <h2>各省站点数量</h2>
           </div>
-          <div class="bar-chart" ref="barChart"></div> <!-- 替换为柱状图容器 -->
+          <div class="province-chart" ref="barChart" @dblclick="handleBarDownload"></div> <!-- 替换为柱状图容器 -->
         </div>
       </div>
         <!-- 中间面板 -->
-        <div class="center-panel">      
-        <div class="station-selector panel-section">
-
-<!-- 折线图容器 -->
-<div v-if="mergedData.length" ref="lineChartRef" class="line-chart"></div>
-<div class="action-buttons">
-  <el-button 
-    type="primary" 
-    size="small" 
-    icon="el-icon-download"
-    @click="exportMonitorData"
-    class="export-button"
-  >
-    导出监测数据
-  </el-button>
-  
-  <el-button 
-    type="primary" 
-    size="small" 
-    icon="el-icon-download"
-    @click="exportSites"
-    class="export-button"
-  >
-    导出站点数据
-  </el-button>
-</div>
-<div class="import-section">
-  <!-- 隐藏的文件输入 -->
-  <input 
-    type="file" 
-    accept=".csv" 
-    @change="handleFileUpload"
-    ref="fileInput"
-    style="display: none"
-  />
-
-  <!-- 可见的操作按钮 -->
-  <el-button 
-    type="primary" 
-    size="small" 
-    icon="el-icon-folder-opened"
-    @click="triggerFileInput"
-    class="file-select-button"
-  >
-    选择CSV文件
-  </el-button>
-
-  <!-- 显示选中的文件名 -->
-  <span v-if="selectedFile" class="file-name">
-    {{ selectedFile.name }} 
-    <span class="file-size">({{ formatFileSize(selectedFile.size) }})</span>
-  </span>
-
-  <!-- 上传按钮带加载状态 -->
-  <el-button 
-    type="success" 
-    size="small" 
-    icon="el-icon-upload"
-    @click="importData" 
-    :disabled="!selectedFile || isUploading"
-    :class="{
-      'enabled': selectedFile && !isUploading,
-      'disabled': !selectedFile || isUploading
-    }"
-    :loading="isUploading"
-    class="upload-button"
-  >
-    {{ isUploading ? '上传中...' : '上传水质数据' }}
-  </el-button>
-</div>
-
-
-     
-          <!-- 选择器 -->
-          <div class="selector-group">
-            <label for="siteSelect" class="selector-label">选择监测点：</label>
-            <select id="siteSelect" v-model="selectedSiteId" @change="onSiteChange" class="selector-dropdown">
-
-              <option
+        <div class="center-panel">
+          <div class="station-selector panel-section">
+            <!-- 折线图容器 -->
+            <div v-if="mergedData.length" ref="lineChartRef" class="line-chart" @dblclick="handlelineDownload"></div>
+            <div class="action-buttons">
+              <el-button
+                  type="primary"
+                  size="small"
+                  icon="el-icon-download"
+                  @click="exportMonitorData"
+                  class="export-button"
+              >
+                导出监测数据  </el-button>
+              <el-button
+                  type="primary"
+                  size="small"
+                  icon="el-icon-download"
+                  @click="exportSites"
+                  class="export-button"
+              >    导出站点数据  </el-button>
+            </div>
+            <div class="import-section">
+              <!-- 隐藏的文件输入 -->
+              <input
+                  type="file"
+                  accept=".csv"
+                  @change="handleFileUpload"
+                  ref="fileInput"
+                  style="display: none"
+              />
+              <!-- 可见的操作按钮 -->
+              <el-button
+                  type="primary"
+                  size="small"
+                  icon="el-icon-folder-opened"
+                  @click="triggerFileInput"
+                  class="file-select-button"
+              >
+                选择CSV文件  </el-button>
+              <!-- 显示选中的文件名 -->
+              <span v-if="selectedFile" class="file-name">
+                {{ selectedFile.name }}
+                <span class="file-size">({{ formatFileSize(selectedFile.size) }})</span>
+              </span>
+              <!-- 上传按钮带加载状态 -->
+              <el-button
+                  type="success"
+                  size="small"
+                  icon="el-icon-upload"
+                  @click="importData"
+                  :disabled="!selectedFile || isUploading"
+                  :class="{
+                    'enabled': selectedFile && !isUploading,
+                          'disabled': !selectedFile || isUploading
+                  }"
+                  :loading="isUploading"
+                  class="upload-button"  >
+                {{ isUploading ? '上传中...' : '上传水质数据' }}
+              </el-button>
+            </div>
+            <!-- 选择器 -->
+            <div class="selector-group">
+              <label for="siteSelect" class="selector-label">选择监测点：</label>
+              <select id="siteSelect" v-model="selectedSiteId" @change="onSiteChange" class="selector-dropdown">             <option
                   v-for="site in siteList"
                   :key="site.site_id"
                   :value="site.site_id"
@@ -104,7 +89,7 @@
           </div>
 
           <!-- 数据表格 -->
-          <table class="data-table">
+          <table class="data-table" @dblclick="handleTableScreenshot">
             <thead>
             <tr>
               <th>时间</th>
@@ -162,13 +147,13 @@
         导出数据
       </el-button>
     </div>
-    <div class="pie-chart" ref="speciesChart"></div>
+    <div class="pie-chart" ref="speciesChart" @dblclick="handlePieDownload"></div>
   </div>
   <div class="panel-section">
     <div class="section-header">
       <h2>鱼群数据对比</h2>
     </div>
-    <div class="line-chart" ref="populationChart"></div>
+    <div class="line-chart" ref="populationChart" @dblclick="handleFishDownload"></div>
   </div>
 </div>
     </div>
@@ -185,6 +170,8 @@ import { exportFishData } from '@/api/auth'
 import { getFishStats } from '@/api/auth';
 import { getFishAnalysis } from "@/api/auth";
 import { getProvinceSiteCount } from "@/api/auth"; // 引入新接口
+import { downloadEChart } from "@/utils/echart";
+import html2canvas from 'html2canvas';
 
 
 export default {
@@ -290,14 +277,15 @@ export default {
     },
 
     initFishAnalysisChart() {
-        const chartDom = document.querySelector(".line-chart");
-        const populationChart = echarts.init(chartDom);
+      const chartDom = document.querySelector(".line-chart");
+      this.populationChart = echarts.init(chartDom);
 
-        const xData = this.fishAnalysisData.map(item => item.species);
-        const avgWeight = this.fishAnalysisData.map(item => item.avg_weight);
-        const avgHeight = this.fishAnalysisData.map(item => item.avg_height);
-        const avgLength = this.fishAnalysisData.map(item => item.avg_length);
-        const avgWidth = this.fishAnalysisData.map(item => item.avg_width);
+
+      const xData = this.fishAnalysisData.map(item => item.species);
+      const avgWeight = this.fishAnalysisData.map(item => item.avg_weight);
+      const avgHeight = this.fishAnalysisData.map(item => item.avg_height);
+      const avgLength = this.fishAnalysisData.map(item => item.avg_length);
+      const avgWidth = this.fishAnalysisData.map(item => item.avg_width);
 
         const option = {
             tooltip: {
@@ -367,9 +355,29 @@ export default {
             ]
         };
 
-        populationChart.setOption(option);
+      this.populationChart.setOption(option);
     },
-    
+
+    handleFishDownload() {
+      if (this.populationChart) {
+        const imgData = this.populationChart.getDataURL({
+          type: 'png',
+          pixelRatio: 2,
+          backgroundColor: "rgba(255,255,255,0.1)"
+        });
+
+        const a = document.createElement('a');
+        a.href = imgData;
+        a.download = 'fish_analysis_chart.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        console.warn("⚠️ 鱼类图表尚未初始化！");
+      }
+    },
+
+
     formatFileSize(bytes) {
       if (bytes === 0) return '0 Bytes';
       const k = 1024;
@@ -424,12 +432,16 @@ export default {
     const fishChart = ref(null)
 
     const lineChartRef = ref(null);
+    const lineChartInstance = ref(null);
+
     const tableData = ref([]);
 
     const mergedData = ref([]);
     const selectedSiteId = ref(null);
     const siteList = ref([]);
+
     const barChart = ref(null); // 柱状图引用
+    const barChartInstance = ref(null);
 
     const initDataTable = (siteData) => {
       tableData.value = siteData;
@@ -450,14 +462,25 @@ export default {
       });
     });
 
+    const handleTableScreenshot = () => {
+      const tableEl = document.querySelector('.data-table');
+      html2canvas(tableEl, { backgroundColor: '#0a1929' }).then(canvas => {
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = 'table.png';
+        link.click();
+      });
+    };
+
       
     // 初始化柱状图
     const initBarChart = (data) => {
       if (!barChart.value) return;
       const chart = echarts.init(barChart.value);
+      barChartInstance.value = chart;
       const provinces = data.map(item => item.province);
       const siteCounts = data.map(item => item.site_count);
-      
+
       const option = {
         tooltip: {
           trigger: 'axis',
@@ -511,6 +534,14 @@ export default {
       chart.setOption(option);
       return chart;
     };
+    const handleBarDownload = () => {
+      if (barChartInstance.value) {
+        downloadEChart(barChartInstance.value, 'province_chart.png');
+      } else {
+        console.warn('图表实例未初始化');
+      }
+    };
+
 
 const fetchProvinceSiteCount = async () => {
   try {
@@ -546,6 +577,9 @@ const fetchProvinceSiteCount = async () => {
         lineChart.clear();
       }
 
+      const chart = echarts.init(lineChartRef.value);
+      lineChartInstance.value = chart;
+
       const xData = siteData.map(d => d.time || d.date);
       const ph = siteData.map(d => d.ph);
       const oxygen = siteData.map(d => d.dissolved_oxygen);
@@ -575,6 +609,15 @@ const fetchProvinceSiteCount = async () => {
 
       lineChart.setOption(option);
     };
+
+    const handlelineDownload = () => {
+      if (lineChartInstance.value) {
+        downloadEChart(lineChartInstance.value, 'water_line_chart.png');
+      } else {
+        console.warn('⚠️ 折线图实例未初始化！');
+      }
+    };
+
 
     const fetchMergedData = async () => {
       const res = await getMergedData()
@@ -660,6 +703,16 @@ const fetchProvinceSiteCount = async () => {
       speciesChart.setOption(option);
     };
 
+    const handlePieDownload = () => {
+      if (speciesChart) {
+        downloadEChart(speciesChart, 'pie_chart.png');
+      } else {
+        console.warn('⚠️ 折线图实例未初始化！');
+      }
+    };
+
+
+
     const initPopulationChart = () => {
       const chartDom = document.querySelector(".line-chart");
       populationChart = echarts.init(chartDom);
@@ -736,6 +789,10 @@ const fetchProvinceSiteCount = async () => {
     };
 
     return {
+      handleTableScreenshot,
+      handlePieDownload,
+      handlelineDownload,
+      handleBarDownload,
       lineChartRef,
       mergedData,
       tableData,
@@ -1095,7 +1152,7 @@ const fetchProvinceSiteCount = async () => {
   color: #666;
 }
 
-.bar-chart {
+.province-chart {
   height: 800px;
   width: 100%;
 }
