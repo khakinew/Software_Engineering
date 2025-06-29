@@ -48,15 +48,10 @@
       <!-- 数据中心分布地图 -->
       <div class="map-section">
         <div class="section-title">数据中心分布</div>
-        <div class="map-container" ref="mapContainer"></div>
+        <div class="map-container" ref="mapContainer" @dblclick="handleMapDownload"></div>
         <div class="location-list">
-          <div
-            v-for="loc in locations"
-            :key="loc.city"
-            class="location-item"
-            :class="{ active: selectedLocation.city === loc.city }"
-            @click="selectLocation(loc)"
-          >
+          <div v-for="loc in locations" :key="loc.city" class="location-item"
+            :class="{ active: selectedLocation.city === loc.city }" @click="selectLocation(loc)">
             <div class="location-dot"></div>
             <div class="location-info">
               <div class="location-name">{{ loc.city }}</div>
@@ -119,15 +114,15 @@
       <div class="stats-section">
         <div class="data-type-stats">
           <div class="section-title">数据类型统计</div>
-          <div class="pyramid-chart" ref="pyramidChart"></div>
+          <div class="pyramid-chart" ref="pyramidChart" @dblclick="handlepyramidDownload()"></div>
         </div>
         <div class="data-distribution">
           <div class="section-title">数据类型占比</div>
-          <div class="radar-chart" ref="radarChart"></div>
+          <div class="radar-chart" ref="radarChart" @dblclick="handleRadarDownload()"></div>
         </div>
         <div class="data-flow">
           <div class="section-title">结构化数据</div>
-          <div class="sankey-chart" ref="sankeyChart"></div>
+          <div class="sankey-chart" ref="sankeyChart" @dblclick="handleSankeyDownload"></div>
         </div>
       </div>
 
@@ -150,6 +145,8 @@
 
 <script>
 import { ref, onMounted, onUnmounted } from "vue";
+import { downloadEChart } from "@/utils/echart";
+
 import * as echarts from "echarts";
 
 export default {
@@ -159,6 +156,10 @@ export default {
     const pyramidChart = ref(null);
     const radarChart = ref(null);
     const sankeyChart = ref(null);
+    const mapContainerMap = ref(null);
+    const pyramidChartMap = ref(null);
+    const radarChartMap = ref(null);
+    const sankeyChartMap = ref(null);
     const mapLoaded = ref(false);
 
     const locations = [
@@ -205,11 +206,10 @@ export default {
     };
 
     // 使用简单的图表代替地图
-    const initLocationChart = () => {
+    const initLocationChart = (chart) => {
       if (!mapContainer.value) return;
-
       try {
-        const chart = echarts.init(mapContainer.value);
+
         const option = {
           backgroundColor: "transparent",
           tooltip: {
@@ -269,13 +269,16 @@ export default {
       } catch (error) {
         console.error("图表加载失败:", error);
       }
+      return chart;
     };
 
     onMounted(() => {
-      initLocationChart();
-      initPyramidChart();
-      initRadarChart();
-      initSankeyChart();
+      mapContainerMap.value = echarts.init(mapContainer.value);
+      initLocationChart(mapContainerMap.value);
+
+      pyramidChartMap.value = initPyramidChart();
+      radarChartMap.value = initRadarChart();
+      sankeyChartMap.value = initSankeyChart();
 
       window.addEventListener("resize", () => {
         pyramidChart.value?.resize();
@@ -327,6 +330,7 @@ export default {
       };
 
       chart.setOption(option);
+      return chart;
     };
 
     const initRadarChart = () => {
@@ -381,6 +385,7 @@ export default {
       };
 
       chart.setOption(option);
+      return chart;
     };
 
     const initSankeyChart = () => {
@@ -411,15 +416,53 @@ export default {
       };
 
       chart.setOption(option);
+      return chart;
     };
-
+    // 下载
+    const handleMapDownload = () => {
+      if (!mapContainerMap.value) {
+        console.warn("图表尚未初始化，无法下载");
+        return;
+      }
+      downloadEChart(mapContainerMap.value, "mapContainer.png");
+    };
+    const handlepyramidDownload = () => {
+      if (!pyramidChartMap.value) {
+        console.warn("图表尚未初始化，无法下载");
+        return;
+      }
+      downloadEChart(pyramidChartMap.value, "pyramidChart.png");
+    };
+    const handleRadarDownload = () => {
+      if (!radarChartMap.value) {
+        console.warn("图表尚未初始化，无法下载");
+        return;
+      }
+      downloadEChart(radarChartMap.value, "radarChart.png");
+    };
+    const handleSankeyDownload = () => {
+      if (!sankeyChartMap.value) {
+        console.warn("图表尚未初始化，无法下载");
+        return;
+      }
+      downloadEChart(sankeyChartMap.value, "sankeyChart.png");
+    };
     return {
+      mapContainer,
+      radarChartMap,
+      pyramidChartMap,
+      sankeyChartMap,
       sensorData,
       selectedLocation,
       locations,
       selectLocation,
       mapContainer,
       mapLoaded,
+      handleMapDownload,
+      downloadEChart,
+      handleSankeyDownload,
+      handleRadarDownload,
+      handlepyramidDownload
     };
   },
 };
