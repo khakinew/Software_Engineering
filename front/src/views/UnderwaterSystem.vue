@@ -1,266 +1,639 @@
 <template>
   <div class="underwater-system">
-    <!-- 顶部计数器 -->
-    <div class="counter-section">
-      <div class="fish-counter">
-        <div class="digit-group">
-          <div class="digit">0</div>
-          <div class="digit">1</div>
-          <div class="digit">0</div>
-          <div class="digit">3</div>
-          <div class="digit">8</div>
-        </div>
-        <div class="counter-labels">
-          <div>今日新增</div>
-          <div>今日死亡</div>
-        </div>
-      </div>
-    </div>
+
+
 
     <div class="main-content">
       <!-- 左侧面板 -->
       <div class="left-panel">
         <div class="panel-section">
           <div class="section-header">
-            <h2>环境得分计算</h2>
+            <h2>各省站点数量</h2>
           </div>
-          <div class="environment-scores">
-            <div class="score-item">
-              <div class="score-label">0.25M深水层</div>
-              <div class="score-value">85</div>
-            </div>
-            <div class="score-item">
-              <div class="score-label">0.5M深水层</div>
-              <div class="score-value">92</div>
-            </div>
-            <div class="score-item">
-              <div class="score-label">0.75M深水层</div>
-              <div class="score-value">88</div>
-            </div>
-            <div class="score-item">
-              <div class="score-label">1.0M深水层</div>
-              <div class="score-value">90</div>
-            </div>
-          </div>
-          <div class="gauge-chart" ref="gaugeChart"></div>
+          <div class="bar-chart" ref="barChart"></div> <!-- 替换为柱状图容器 -->
         </div>
       </div>
+        <!-- 中间面板 -->
+        <div class="center-panel">      
+        <div class="station-selector panel-section">
 
-      <!-- 中间面板 -->
-      <div class="center-panel">
-        <div class="info-cards">
-          <div class="info-card">
-            <div class="card-header">鱼种</div>
-            <div class="card-value">50<span class="unit">+</span></div>
-          </div>
-          <div class="info-card">
-            <div class="card-header">鱼苗</div>
-            <div class="card-value">500<span class="unit">尾</span></div>
-          </div>
-          <div class="info-card">
-            <div class="card-header">生长</div>
-            <div class="card-value">600<span class="unit">尾</span></div>
-          </div>
-        </div>
+<!-- 折线图容器 -->
+<div v-if="mergedData.length" ref="lineChartRef" class="line-chart"></div>
+<div class="action-buttons">
+  <el-button 
+    type="primary" 
+    size="small" 
+    icon="el-icon-download"
+    @click="exportMonitorData"
+    class="export-button"
+  >
+    导出监测数据
+  </el-button>
+  
+  <el-button 
+    type="primary" 
+    size="small" 
+    icon="el-icon-download"
+    @click="exportSites"
+    class="export-button"
+  >
+    导出站点数据
+  </el-button>
+</div>
+<div class="import-section">
+  <!-- 隐藏的文件输入 -->
+  <input 
+    type="file" 
+    accept=".csv" 
+    @change="handleFileUpload"
+    ref="fileInput"
+    style="display: none"
+  />
 
-        <div class="circle-progress">
-          <div class="progress-title">总信息统计展示</div>
-          <div class="progress-chart" ref="circleProgressChart"></div>
-          <div class="digital-display">
-            <div class="display-title">已保障养殖鱼群</div>
-            <div class="digital-number">
-              <span
-                v-for="(digit, index) in '000000000'"
-                :key="index"
-                class="digit-box"
-                >{{ digit }}</span
+  <!-- 可见的操作按钮 -->
+  <el-button 
+    type="primary" 
+    size="small" 
+    icon="el-icon-folder-opened"
+    @click="triggerFileInput"
+    class="file-select-button"
+  >
+    选择CSV文件
+  </el-button>
+
+  <!-- 显示选中的文件名 -->
+  <span v-if="selectedFile" class="file-name">
+    {{ selectedFile.name }} 
+    <span class="file-size">({{ formatFileSize(selectedFile.size) }})</span>
+  </span>
+
+  <!-- 上传按钮带加载状态 -->
+  <el-button 
+    type="success" 
+    size="small" 
+    icon="el-icon-upload"
+    @click="importData" 
+    :disabled="!selectedFile || isUploading"
+    :class="{
+      'enabled': selectedFile && !isUploading,
+      'disabled': !selectedFile || isUploading
+    }"
+    :loading="isUploading"
+    class="upload-button"
+  >
+    {{ isUploading ? '上传中...' : '上传水质数据' }}
+  </el-button>
+</div>
+
+
+     
+          <!-- 选择器 -->
+          <div class="selector-group">
+            <label for="siteSelect" class="selector-label">选择监测点：</label>
+            <select id="siteSelect" v-model="selectedSiteId" @change="onSiteChange" class="selector-dropdown">
+
+              <option
+                  v-for="site in siteList"
+                  :key="site.site_id"
+                  :value="site.site_id"
+                  :style="{ color: site.status === '正常' ? 'green' : 'red' }"
               >
-              <span class="unit">尾</span>
-            </div>
+                {{ site.site_name }}（{{ site.status }}）
+              </option>
+            </select>
           </div>
+
+          <!-- 数据表格 -->
+          <table class="data-table">
+            <thead>
+            <tr>
+              <th>时间</th>
+              <th>pH</th>
+              <th>溶解氧</th>
+              <th>温度</th>
+              <th>浊度</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="(row, index) in tableData" :key="index">
+              <td>{{ row.date }} {{ row.time }}</td>
+              <td>{{ row.ph }}</td>
+              <td>{{ row.dissolved_oxygen }}</td>
+              <td>{{ row.temperature }}</td>
+              <td>{{ row.turbidity }}</td>
+            </tr>
+            </tbody>
+          </table>
         </div>
 
-        <div class="device-info">
-          <div class="device-card">
-            <div class="card-header">镜头</div>
-            <div class="card-value">5<span class="unit">+</span></div>
-          </div>
-          <div class="device-card">
-            <div class="card-header">云台</div>
-            <div class="card-value">2</div>
-          </div>
-          <div class="device-card">
-            <div class="card-header">声呐</div>
-            <div class="card-value">1</div>
-          </div>
-        </div>
       </div>
 
       <!-- 右侧面板 -->
+    
+      
       <div class="right-panel">
-        <div class="panel-section">
-          <div class="section-header">
-            <h2>鱼群种类统计</h2>
-          </div>
-          <div class="pie-chart" ref="speciesChart"></div>
-        </div>
-        <div class="panel-section">
-          <div class="section-header">
-            <h2>鱼群数量变化</h2>
-          </div>
-          <div class="line-chart" ref="populationChart"></div>
-        </div>
-      </div>
+
+    <div class="info-cards">
+    <div class="info-card">
+      <div class="card-header">鱼种</div>
+      <div class="card-value">{{ stats.species_count }}<span class="unit">+</span></div>
+    </div>
+    <div class="info-card">
+      <div class="card-header">鱼苗</div>
+      <div class="card-value">{{ stats.total_fish }}<span class="unit">尾</span></div>
+    </div>
+    <div class="info-card">
+      <div class="card-header">平均重量</div>
+      <div class="card-value">{{ stats.avg_weight }}<span class="unit">g</span></div>
+    </div>
+  </div>  
+
+  <div class="panel-section">
+    <div class="section-header">
+      <h2>鱼群种类统计</h2>
+      <!-- 添加导出按钮 -->
+      <el-button 
+        type="primary" 
+        size="small" 
+        icon="el-icon-download"
+        @click="exportFishData"
+        class="export-button"
+      >
+        导出数据
+      </el-button>
+    </div>
+    <div class="pie-chart" ref="speciesChart"></div>
+  </div>
+  <div class="panel-section">
+    <div class="section-header">
+      <h2>鱼群数据对比</h2>
+    </div>
+    <div class="line-chart" ref="populationChart"></div>
+  </div>
+</div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
+import { nextTick, ref, onMounted } from "vue";
 import * as echarts from "echarts";
+import { getMergedData,getFishList } from "@/api/auth";
+import { exportMonitorData ,exportSites } from '@/api/auth' 
+import { authApi } from "@/api/auth";
+import { exportFishData } from '@/api/auth' 
+import { getFishStats } from '@/api/auth';
+import { getFishAnalysis } from "@/api/auth";
+import { getProvinceSiteCount } from "@/api/auth"; // 引入新接口
+
 
 export default {
+  data() {
+    return {
+      // 添加响应式变量
+      selectedFile: null,
+      isUploading: false,
+      stats: {
+        species_count: 0,
+        total_fish: 0,
+        avg_weight: 0
+      },
+      fishAnalysisData: [],
+      timer: null
+    };
+  },
+  mounted() {
+    this.fetchFishStats();
+    // 每5分钟刷新一次数据
+    this.timer = setInterval(this.fetchFishStats, 5 * 60 * 1000);
+    this.fetchFishAnalysis(); // 新增：获取鱼类分析数据
+},
+  beforeDestroy() {
+    clearInterval(this.timer);
+  },
+  methods: {
+    // 导出监测数据
+    async exportMonitorData() {
+      const result = await exportMonitorData();
+      if (result.success) {
+        alert("水质数据导出成功");
+      } else {
+        alert(result.message);
+        console.error("水质数据导出失败详情:", result.message);
+    
+        // 特定错误处理
+        if (result.message.includes("401")) {
+          alert("请重新登录");
+        } else if (result.message.includes("403")) {
+          alert("您没有导出权限");
+        }
+      }
+    },
+
+    async exportSites() {
+      const result = await exportSites();
+      if (result.success) {
+        alert("站点数据导出成功");
+      } else {
+        alert(result.message);
+        console.error("站点数据导出失败详情:", result.message);
+    
+        // 特定错误处理
+        if (result.message.includes("401")) {
+          alert("请重新登录");
+        } else if (result.message.includes("403")) {
+          alert("您没有导出权限");
+        }
+      }
+    },
+
+    // 导出鱼类数据
+    async exportFishData() {
+      const result = await exportFishData();
+      if (result.success) {
+        alert("鱼类数据导出成功");
+      } else {
+        alert(result.message);
+        console.error("鱼类数据导出失败详情:", result.message);
+    
+        // 特定错误处理
+        if (result.message.includes("401")) {
+          alert("请重新登录");
+        } else if (result.message.includes("403")) {
+          alert("您没有导出权限");
+        }
+      }
+    },
+    async fetchFishStats() {
+      try {
+        const response = await getFishStats();
+        if (response.success) {
+          this.stats = {
+            species_count: response.species_count,
+            total_fish: response.total_fish,
+            avg_weight: response.avg_weight
+          };
+        }
+      } catch (error) {
+        console.error('获取鱼类统计数据失败:', error);
+      }
+    },
+
+    async fetchFishAnalysis() {
+        const result = await getFishAnalysis();
+        if (result.success) {
+            this.fishAnalysisData = result.data;
+            this.initFishAnalysisChart();
+        } else {
+            console.error('获取鱼类分析数据失败:', result.message);
+        }
+    },
+
+    initFishAnalysisChart() {
+        const chartDom = document.querySelector(".line-chart");
+        const populationChart = echarts.init(chartDom);
+
+        const xData = this.fishAnalysisData.map(item => item.species);
+        const avgWeight = this.fishAnalysisData.map(item => item.avg_weight);
+        const avgHeight = this.fishAnalysisData.map(item => item.avg_height);
+        const avgLength = this.fishAnalysisData.map(item => item.avg_length);
+        const avgWidth = this.fishAnalysisData.map(item => item.avg_width);
+
+        const option = {
+            tooltip: {
+                trigger: "axis"
+            },
+            legend: {
+                data: ["平均重量", "平均高度", "平均长度", "平均宽度"],
+                textStyle: {
+                    color: '#ff4081'
+                }
+            },
+            xAxis: {
+                type: "category",
+                data: xData,
+                axisLine: {
+                    lineStyle: {
+                        color: "#fff"
+                    }
+                }
+            },
+            yAxis: {
+                type: "value",
+                axisLine: {
+                    lineStyle: {
+                        color: "#fff"
+                    }
+                },
+                splitLine: {
+                    lineStyle: {
+                        color: "rgba(255, 255, 255, 0.1)"
+                    }
+                }
+            },
+            series: [
+                {
+                    name: "平均重量",
+                    type: "line",
+                    data: avgWeight,
+                    lineStyle: {
+                        color: "#58D9F9"
+                    }
+                },
+                {
+                    name: "平均高度",
+                    type: "line",
+                    data: avgHeight,
+                    lineStyle: {
+                        color: "#FFA500"
+                    }
+                },
+                {
+                    name: "平均长度",
+                    type: "line",
+                    data: avgLength,
+                    lineStyle: {
+                        color: "#FF6347"
+                    }
+                },
+                {
+                    name: "平均宽度",
+                    type: "line",
+                    data: avgWidth,
+                    lineStyle: {
+                        color: "#9370DB"
+                    }
+                }
+            ]
+        };
+
+        populationChart.setOption(option);
+    },
+    
+    formatFileSize(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    },
+    // 触发文件选择对话框
+    triggerFileInput() {
+      this.$refs.fileInput.click();
+    },
+
+    // 处理文件选择
+    handleFileUpload(event) {
+      this.selectedFile = event.target.files[0];
+    },
+
+    // 新增：执行数据导入
+    async importData() {
+  if (!this.selectedFile) {
+    alert("请先选择CSV文件"); // 替换为 alert
+    return;
+  }
+
+  this.isUploading = true;
+  
+  try {
+    const result = await authApi.importMonitorData(this.selectedFile);
+    
+    if (result.success) {
+      alert("数据导入成功"); // 替换为 alert
+      this.selectedFile = null;
+      this.$refs.fileInput.value = "";
+    } else {
+      alert(result.message || "导入失败"); // 替换为 alert
+    }
+  } catch (error) {
+    console.error("导入失败:", error);
+    alert(`导入失败: ${error.message}`); // 替换为 alert
+  } finally {
+    this.isUploading = false;
+  }
+}
+  },
+
   name: "UnderwaterSystem",
   setup() {
-    let gaugeChart = null;
-    let circleProgressChart = null;
     let speciesChart = null;
     let populationChart = null;
+    let lineChart = null;
+
+    const fishChart = ref(null)
+
+    const lineChartRef = ref(null);
+    const tableData = ref([]);
+
+    const mergedData = ref([]);
+    const selectedSiteId = ref(null);
+    const siteList = ref([]);
+    const barChart = ref(null); // 柱状图引用
+
+    const initDataTable = (siteData) => {
+      tableData.value = siteData;
+    };
 
     onMounted(() => {
-      initGaugeChart();
-      initCircleProgressChart();
+      fetchFishData();
       initSpeciesChart();
       initPopulationChart();
+      fetchMergedData();
+      fetchProvinceSiteCount(); // 获取数据并初始化图表
 
       // 响应式调整
       window.addEventListener("resize", () => {
-        gaugeChart?.resize();
-        circleProgressChart?.resize();
         speciesChart?.resize();
         populationChart?.resize();
+        lineChart?.resize();
       });
     });
 
-    const initGaugeChart = () => {
-      const chartDom = document.querySelector(".gauge-chart");
-      gaugeChart = echarts.init(chartDom);
-
+      
+    // 初始化柱状图
+    const initBarChart = (data) => {
+      if (!barChart.value) return;
+      const chart = echarts.init(barChart.value);
+      const provinces = data.map(item => item.province);
+      const siteCounts = data.map(item => item.site_count);
+      
       const option = {
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: {
+            type: 'shadow'
+          }
+        },
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '3%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'value',
+          axisLine: {
+            lineStyle: {
+              color: '#fff'
+            }
+          },
+          splitLine: {
+            lineStyle: {
+              color: 'rgba(255, 255, 255, 0.1)'
+            }
+          }
+        },
+        yAxis: {
+          type: 'category',
+          data: provinces,
+          axisLine: {
+            lineStyle: {
+              color: '#fff'
+            }
+          }
+        },
         series: [
           {
-            type: "gauge",
-            startAngle: 180,
-            endAngle: 0,
-            min: 0,
-            max: 100,
-            splitNumber: 10,
+            type: 'bar',
+            data: siteCounts,
             itemStyle: {
-              color: "#58D9F9",
-              shadowColor: "rgba(0,138,255,0.45)",
-              shadowBlur: 10,
-              shadowOffsetX: 2,
-              shadowOffsetY: 2,
-            },
-            progress: {
-              show: true,
-              roundCap: true,
-              width: 18,
-            },
-            pointer: {
-              icon: "path://M2090.36389,615.30999 L2090.36389,615.30999 C2091.48372,615.30999 2092.40383,616.194028 2092.44859,617.312956 L2096.90698,728.755929 C2097.05155,732.369577 2094.2393,735.416212 2090.62566,735.56078 C2090.53845,735.564269 2090.45117,735.566014 2090.36389,735.566014 L2090.36389,735.566014 C2086.74736,735.566014 2083.81557,732.63423 2083.81557,729.017692 C2083.81557,728.930412 2083.81732,728.84314 2083.82081,728.755929 L2088.2792,617.312956 C2088.32396,616.194028 2089.24407,615.30999 2090.36389,615.30999 Z",
-              length: "75%",
-              width: 16,
-              offsetCenter: [0, "5%"],
-            },
-            axisLine: {
-              roundCap: true,
-              lineStyle: {
-                width: 18,
-              },
-            },
-            axisTick: {
-              splitNumber: 2,
-              lineStyle: {
-                width: 2,
-                color: "#999",
-              },
-            },
-            splitLine: {
-              length: 12,
-              lineStyle: {
-                width: 3,
-                color: "#999",
-              },
-            },
-            axisLabel: {
-              distance: 30,
-              color: "#999",
-              fontSize: 12,
-            },
-            title: {
-              offsetCenter: [0, "30%"],
-              fontSize: 20,
-              color: "#fff",
-            },
-            detail: {
-              backgroundColor: "#fff",
-              borderColor: "#999",
-              borderWidth: 2,
-              width: 60,
-              height: 40,
-              offsetCenter: [0, "70%"],
-              valueAnimation: true,
-              formatter: "{value}",
-              color: "#58D9F9",
-            },
-            data: [
-              {
-                value: 70,
-                name: "环境评分",
-              },
-            ],
-          },
-        ],
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                { offset: 0, color: '#83bff6' },
+                { offset: 0.5, color: '#188df0' },
+                { offset: 1, color: '#188df0' }
+              ])
+            }
+          }
+        ]
       };
-
-      gaugeChart.setOption(option);
+      
+      chart.setOption(option);
+      return chart;
     };
 
-    const initCircleProgressChart = () => {
-      const chartDom = document.querySelector(".progress-chart");
-      circleProgressChart = echarts.init(chartDom);
+const fetchProvinceSiteCount = async () => {
+  try {
+    const res = await getProvinceSiteCount();
+    
+    // 检查响应结构
+    if (res.data?.success && res.data.data) {
+      await nextTick(); // 等待 DOM 渲染完成
+      initBarChart(res.data.data);
+    }
+  } catch (error) {
+    console.error('请求失败:', error);
+    
+    // 检查错误响应
+    if (error.response) {
+      console.error('错误详情:', error.response.data);
+      if (error.response.status === 401) {
+        alert("认证失败，请重新登录");
+      }
+    }
+  }
+};
+    
+    const initLineChart = (siteData) => {
+      if (!lineChartRef.value) {
+        console.warn("⚠️ 图表容器还没挂载！");
+        return;
+      }
+
+      if (!lineChart) {
+        lineChart = echarts.init(lineChartRef.value);
+      } else {
+        lineChart.clear();
+      }
+
+      const xData = siteData.map(d => d.time || d.date);
+      const ph = siteData.map(d => d.ph);
+      const oxygen = siteData.map(d => d.dissolved_oxygen);
+      const temperature = siteData.map(d => d.temperature);
 
       const option = {
-        series: [
-          {
-            type: "pie",
-            radius: ["75%", "90%"],
-            avoidLabelOverlap: false,
-            label: {
-              show: false,
-            },
-            emphasis: {
-              label: {
-                show: false,
-              },
-            },
-            data: [
-              { value: 75, name: "已完成", itemStyle: { color: "#58D9F9" } },
-              {
-                value: 25,
-                name: "未完成",
-                itemStyle: { color: "rgba(255, 255, 255, 0.2)" },
-              },
-            ],
+        title: {
+          text: "水质变化折线图",
+          textStyle: {
+            color: '#ff4081'
           },
+        },
+        tooltip: { trigger: "axis" },
+        legend: { data: ["pH", "溶解氧", "温度"] ,
+          textStyle: {
+            color: '#ff4081'
+          },
+        },
+        xAxis: { type: "category", data: xData },
+        yAxis: { type: "value" },
+        series: [
+          { name: "pH", type: "line", data: ph },
+          { name: "溶解氧", type: "line", data: oxygen },
+          { name: "温度", type: "line", data: temperature },
         ],
       };
 
-      circleProgressChart.setOption(option);
+      lineChart.setOption(option);
     };
 
-    const initSpeciesChart = () => {
+    const fetchMergedData = async () => {
+      const res = await getMergedData()
+      console.log("🐟 来自后端的位置数据：", res)
+
+      if (!Array.isArray(res)) {
+        console.error("🐟 位置数据格式错误，期待的是数组格式！");
+        return;
+      }
+
+      mergedData.value = res || [];
+
+      siteList.value = [
+        ...new Map(mergedData.value.map(item => [item.site_id, item])).values()
+      ];
+
+      selectedSiteId.value = siteList.value[0]?.site_id;
+
+      await nextTick();
+      updateChartsAndTables();
+    };
+
+    const updateChartsAndTables = () => {
+      const siteData = mergedData.value.filter(item => item.site_id === selectedSiteId.value);
+      tableData.value = siteData;
+
+      initLineChart(siteData);
+    };
+
+
+
+    const fetchFishData = async () =>{
+      const res = await getFishList()
+      console.log("🐟 来自后端的鱼类数据：", res)
+
+      if (!Array.isArray(res)) {
+        console.error("🐟 鱼类数据格式错误，期待的是数组格式！");
+        return;
+      }
+
+
+      const speciesCount = {}
+      res.forEach(fish =>{
+        speciesCount[fish.species] = (speciesCount[fish.species]||0)+1
+      });
+
+      const chartData = Object.entries(speciesCount).map(([species,count]) =>({
+        name:species,
+        value:count
+      }));
+      await nextTick();
+      initSpeciesChart(chartData);
+    };
+
+    const onSiteChange = () => {
+      updateChartsAndTables();
+    };
+
+    const initSpeciesChart = (chartData) => {
       const chartDom = document.querySelector(".pie-chart");
       speciesChart = echarts.init(chartDom);
 
@@ -272,13 +645,7 @@ export default {
           {
             type: "pie",
             radius: "70%",
-            data: [
-              { value: 30, name: "鲈鱼", itemStyle: { color: "#FF6B6B" } },
-              { value: 25, name: "鲤鱼", itemStyle: { color: "#4ECDC4" } },
-              { value: 20, name: "草鱼", itemStyle: { color: "#45B7D1" } },
-              { value: 15, name: "鲫鱼", itemStyle: { color: "#96CEB4" } },
-              { value: 10, name: "其他", itemStyle: { color: "#FFEEAD" } },
-            ],
+            data: chartData,
             emphasis: {
               itemStyle: {
                 shadowBlur: 10,
@@ -368,7 +735,15 @@ export default {
       populationChart.setOption(option);
     };
 
-    return {};
+    return {
+      lineChartRef,
+      mergedData,
+      tableData,
+      siteList,
+      selectedSiteId,
+      onSiteChange,
+      barChart,
+    };
   },
 };
 </script>
@@ -404,13 +779,6 @@ export default {
   font-size: 24px;
   font-weight: bold;
   color: #58d9f9;
-}
-
-.counter-labels {
-  display: flex;
-  gap: 20px;
-  color: #90caf9;
-  font-size: 14px;
 }
 
 .main-content {
@@ -460,10 +828,6 @@ export default {
   font-weight: bold;
 }
 
-.gauge-chart {
-  height: 300px;
-}
-
 .info-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -495,13 +859,6 @@ export default {
   margin-left: 2px;
 }
 
-.circle-progress {
-  background-color: rgba(0, 30, 60, 0.5);
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  text-align: center;
-}
 
 .progress-title {
   color: #90caf9;
@@ -546,4 +903,211 @@ export default {
 .line-chart {
   height: 300px;
 }
+.station-selector {
+  background-color: rgba(0, 30, 60, 0.5);
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.selector-group {
+  margin: 15px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.selector-label {
+  color: #90caf9;
+  font-size: 14px;
+}
+
+.selector-dropdown {
+  background-color: #0a1929;
+  color: #58d9f9;
+  border: 1px solid #58d9f9;
+  border-radius: 4px;
+  padding: 5px 10px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #ffffff;
+}
+
+.data-table th,
+.data-table td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 10px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.data-table th {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #90caf9;
+}
+
+.data-table tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.data-table tr:hover {
+  background-color: rgba(88, 217, 249, 0.1);
+}
+
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.export-button {
+  background-color: #409EFF;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.3s;
+  display: flex;
+  align-items: center;
+}
+
+.export-button:hover {
+  background-color: #66b1ff;
+}
+
+.export-button i {
+  margin-right: 5px;
+}
+
+/* 按钮容器 */
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.import-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+/* 按钮通用样式 */
+.export-button,
+.file-select-button,
+.upload-button {
+  padding: 8px 15px;
+  border-radius: 4px;
+  font-size: 13px;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+}
+
+/* 导出按钮样式 */
+.export-button {
+  background-color: #409EFF;
+  color: white;
+  border: none;
+}
+
+.export-button:hover {
+  background-color: #66b1ff;
+}
+
+/* 文件选择按钮样式 */
+.file-select-button {
+  background-color: #67C23A;
+  color: white;
+  border: none;
+}
+
+.file-select-button:hover {
+  background-color: #85ce61;
+}
+
+/* 上传按钮 - 启用状态 */
+.upload-button.enabled {
+  background-color: #67C23A; /* 绿色 */
+  color: white;
+  border: none;
+  cursor: pointer;
+  opacity: 1;
+}
+
+/* 上传按钮 - 禁用状态 */
+.upload-button.disabled {
+  background-color: #f0f9eb;
+  color: #c2c7cc;
+  border: 1px solid #ebeef5;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* 悬停效果 */
+.upload-button.enabled:hover {
+  background-color: #85ce61;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(103, 194, 58, 0.3);
+}
+
+/* 加载动画 */
+.el-button.is-loading:before {
+  background-color: rgba(103, 194, 58, 0.3);
+}
+
+
+/* 文件名样式 */
+.file-name {
+  margin: 0 10px;
+  font-size: 13px;
+  color: #606266;
+}
+
+.file-size {
+  color: #909399;
+  font-size: 12px;
+}
+
+.digital-number {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #00aaff;
+  text-align: center;
+  margin: 15px 0;
+}
+
+.unit {
+  font-size: 1rem;
+  font-weight: normal;
+  margin-left: 5px;
+  color: #666;
+}
+
+.bar-chart {
+  height: 800px;
+  width: 100%;
+}
+
+/* 移除不再需要的样式 */
+.environment-scores {
+  display: none;
+}
+
+/* 调整面板高度 */
+.left-panel .panel-section {
+  height: 500px; /* 根据实际需要调整 */
+}
+
 </style>

@@ -52,7 +52,7 @@
                   <td>{{ user.role }}</td>
                   <td>
                     <span :class="['status-badge', user.status]">
-                      {{ user.status === "active" ? "正常" : "禁用" }}
+                      {{ user.status=='active' ? "正常" : "禁用" }}
                     </span>
                   </td>
                   <td>{{ user.createTime }}</td>
@@ -250,11 +250,47 @@
         </div>
       </div>
     </div>
+
+    <!-- 编辑 -->
+    <div v-if="showUpdateUserModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>编辑用户</h3>
+          <button class="close-btn" @click="showUpdateUserModal = false">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>用户名</label>
+            <input type="text" v-model="updateUser.username" />
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" v-model="updateUser.password" />
+          </div>
+          <div class="form-group">
+            <label>角色</label>
+            <select v-model="updateUser.role">
+              <option value="user">普通用户</option>
+              <option value="admin">管理员</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" @click="showUpdateUserModal = false">
+            取消
+          </button>
+          <button class="confirm-btn" @click="updateUserHa">确认</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, computed, onUnmounted } from "vue";
+import { get_users,deleteUserApi,addUserApi ,updateUserApi } from "@/api/auth";
+import { ref, onMounted, computed, onUnmounted,reactive } from "vue";
 
 export default {
   name: "Admin",
@@ -263,6 +299,17 @@ export default {
     const currentTime = ref("");
     const currentMenu = ref("users");
     const showAddUserModal = ref(false);
+    const showUpdateUserModal=ref(false)
+    const editUser=(user)=>{
+      updateUser.role=user.role
+      updateUser.username=user.username
+      showUpdateUserModal.value=true
+    }
+    const updateUser=reactive({
+      username:"",
+      password:"",
+      role:''
+    })
 
     // 系统设置数据
     const settings = ref({
@@ -271,7 +318,20 @@ export default {
       logRetention: "30",
       maintenanceTime: "03:00",
     });
-
+    const updateUserHa=async ()=>{
+    
+      
+      const data=await updateUserApi(updateUser)
+      if (data.data.code!=200){
+        alert(data.data.message)
+        showUpdateUserModal.value=false
+        return 0
+      }
+      alert("修改成功")
+      showUpdateUserModal.value=false
+      users.value= (await get_users()).data.data
+    }
+ 
     // 日志数据 - 移到最前面定义
     const logs = ref([
       {
@@ -422,27 +482,10 @@ export default {
     };
 
     // 用户管理功能增强
-    const users = ref([
-      {
-        id: 1,
-        username: "admin",
-        role: "管理员",
-        status: "active",
-        createTime: "2024-01-01",
-        lastLogin: "2024-02-01 10:00:00",
-        permissions: ["all"],
-      },
-      {
-        id: 2,
-        username: "operator",
-        role: "运维人员",
-        status: "active",
-        createTime: "2024-01-15",
-        lastLogin: "2024-02-01 09:30:00",
-        permissions: ["monitor", "logs"],
-      },
-    ]);
-
+    const users = ref([]);
+    get_users().then((res) => {
+      users.value = res.data.data;
+    });
     // 权限管理
     const roles = ref([
       {
@@ -486,6 +529,7 @@ export default {
 
     // 添加用户
     const addUser = async () => {
+
       if (!newUser.value.username || !newUser.value.password) {
         alert("用户名和密码不能为空");
         return;
@@ -496,15 +540,29 @@ export default {
         username: newUser.value.username,
         role: newUser.value.role,
         status: "active",
-        createTime: new Date().toLocaleDateString(),
+        createTime: new Date().toISOString().replace('T', ' ').slice(0, 19),
         lastLogin: "-",
         permissions: roles.value.find((r) => r.name === newUser.value.role)
           ?.permissions || ["view"],
       };
+      const user_copy=JSON.parse(JSON.stringify(user));
+      user_copy['password']=newUser.value.password;
+      user_copy['role']='user'
+      if (user_copy['role']!='普通用户'){
+        user_copy['role']="admin";
+      }
+      const resData=await addUserApi(user_copy);
+      console.log(resData.data);
 
-      users.value.push(user);
+      if (resData.data.code==200){
+
+        users.value.push(user);
       showAddUserModal.value = false;
       newUser.value = { username: "", password: "", role: "普通用户" };
+      alert("添加成功");
+      return ;
+      }
+      alert("添加失败:",resData.data.message);
     };
 
     // 删除用户
@@ -515,10 +573,18 @@ export default {
       }
 
       if (confirm(`确定要删除用户 ${user.username} 吗？`)) {
-        users.value = users.value.filter((u) => u.id !== user.id);
+        const resData=await deleteUserApi(user.id);
+        console.log(resData);
+        
+        if(resData.data.code==200){
+          users.value = users.value.filter((u) => u.id !== user.id);
+          alert("删除成功");
+          return ;
+        }
+        alert("删除失败");
       }
     };
-
+  
     // 系统设置
     const saveSettings = () => {
       // 实现保存设置功能
@@ -540,11 +606,14 @@ export default {
       systemStatus,
       backupConfig,
       showAddUserModal,
+      showUpdateUserModal,
+      updateUser,
       newUser,
       logFilter,
       filteredLogs,
       logs,
       settings,
+      updateUserHa,
       switchMenu: (menu) => (currentMenu.value = menu),
       addUser,
       deleteUser,
@@ -553,6 +622,8 @@ export default {
       addLog,
       clearLogs,
       exportLogs,
+      editUser,
+      
     };
   },
 };

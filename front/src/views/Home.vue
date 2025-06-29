@@ -1,5 +1,6 @@
 <template>
   <div class="home">
+    <AlertBanner />
     <!-- 左侧视频区域 -->
     <div class="section video-section">
       <div class="section-header">
@@ -18,7 +19,14 @@
           </button>
         </div>
         <div class="video-player">
-          <img :src="videoSource" alt="视频流" class="video-stream" />
+          <video
+              class="video-stream"
+              src="/videos/shiping.mp4"
+              controls
+              autoplay
+              muted
+              loop
+          ></video>
           <div class="video-info">{{ currentDate }} {{ currentTime }}</div>
         </div>
         <div class="video-controls">
@@ -26,29 +34,29 @@
             <h3>附加功能</h3>
             <div class="control-buttons">
               <button class="control-btn" :class="{ active: controls.camera }">
-                <i class="icon-camera"></i>
+                <i class="icon-camera">📷</i>
                 摄像机
               </button>
               <button class="control-btn" :class="{ active: controls.light }">
-                <i class="icon-light"></i>
+                <i class="icon-light">💡</i>
                 灯光
               </button>
               <button class="control-btn" :class="{ active: controls.cleaner }">
-                <i class="icon-cleaner"></i>
+                <i class="icon-cleaner">🧹</i>
                 清洁刷
               </button>
             </div>
             <div class="control-buttons">
               <button class="control-btn">
-                <i class="icon-playback"></i>
+                <i class="icon-playback">🔵</i>
                 视频回放
               </button>
               <button class="control-btn">
-                <i class="icon-split"></i>
+                <i class="icon-split">💟</i>
                 视频同时播放
               </button>
               <button class="control-btn">
-                <i class="icon-cloud"></i>
+                <i class="icon-cloud">📹️</i>
                 云台摄像机
               </button>
             </div>
@@ -91,7 +99,7 @@
           <h2>海洋牧场位置展示</h2>
         </div>
         <div class="map-container">
-          <img :src="mapSource" alt="位置地图" class="map-image" />
+          <div id="amap" class="map-image"></div>
         </div>
       </div>
 
@@ -162,8 +170,14 @@
 <script>
 import { ref, onMounted, computed } from "vue";
 import * as echarts from "echarts";
+import AMapLoader from '@amap/amap-jsapi-loader';
+import AlertBanner from '../components/AlertBanner.vue';
+
 
 export default {
+  components: {
+    AlertBanner
+  },
   name: "Home",
   setup() {
     const currentVideo = ref(1);
@@ -182,13 +196,7 @@ export default {
       }月${date.getDate()}日`;
     });
 
-    const currentTime = computed(() => {
-      const date = new Date();
-      return `${date.getHours().toString().padStart(2, "0")}:${date
-        .getMinutes()
-        .toString()
-        .padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}`;
-    });
+    const currentTime = ref("");
 
     const waterData = ref([
       {
@@ -221,10 +229,33 @@ export default {
     let chart = null;
 
     onMounted(() => {
+      AMapLoader.load({
+        key:"035feed40c80a0a3a028dc37b5166910",
+        version:"2.0",
+        plugins:["Amap.Geolocation"],
+      })
+          .then((AMap)=>{
+            const map = new AMap.Map("amap", {
+              resizeEnable: true,
+              zoom: 11,
+              center: [117.77475, 39.064596], // 默认中心点，北京
+            });
+            new AMap.Marker({
+              position: [117.77475, 39.064596],
+              map: map,
+            });
+          })
+          .catch((e)=>{
+            console.error("高德地图加载失败：",e);
+          });
       initChart();
       // 更新当前时间
       setInterval(() => {
-        currentTime.value = new Date().toLocaleTimeString();
+        const date = new Date();
+        currentTime.value = `${date.getHours().toString().padStart(2, "0")}:${date
+          .getMinutes()
+          .toString()
+          .padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}`;
       }, 1000);
     });
 

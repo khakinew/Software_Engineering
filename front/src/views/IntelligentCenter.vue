@@ -41,8 +41,8 @@
         <h3 class="panel-title">图像识别</h3>
         <div class="video-container">
           <div class="main-video">
-            <video ref="mainVideo" autoplay loop muted>
-              <source src="/videos/sample.mp4" type="video/mp4" />
+            <video ref="mainVideo" autoplay loop muted :key="currentVideo">
+              <source :src="currentVideoSrc" type="video/mp4" />
             </video>
             <div class="video-info">
               <span>2024年01月31日 星期三 21:00:00</span>
@@ -59,6 +59,22 @@
             </button>
           </div>
         </div>
+
+        <div class="bottom-cameras">
+          <div class="camera-view">
+            <h4 class="panel-title">左目镜头</h4>
+            <video :key="leftEyeSrc" autoplay muted loop playsinline>
+              <source :src="leftEyeSrc" type="video/mp4" />
+            </video>
+          </div>
+          <div class="camera-view">
+            <h4 class="panel-title">右目镜头</h4>
+            <video :key="rightEyeSrc" autoplay muted loop playsinline>
+              <source :src="rightEyeSrc" type="video/mp4" />
+            </video>
+          </div>
+        </div>
+
         <div class="fish-info">
           <h3 class="section-title">识别出的鱼的信息</h3>
           <div class="info-grid">
@@ -115,19 +131,12 @@
 
     <!-- 右侧监控面板 -->
     <div class="right-panel">
-      <div class="camera-feeds">
-        <h3 class="panel-title">左目镜头</h3>
-        <div class="camera-view">
-          <img src="/images/camera1.jpg" alt="左目镜头视图" />
-        </div>
-        <h3 class="panel-title">右目镜头</h3>
-        <div class="camera-view">
-          <img src="/images/camera2.jpg" alt="右目镜头视图" />
-        </div>
-      </div>
       <div class="ai-stats">
         <div class="ai-logo">
-          <img src="/images/ai-logo.png" alt="AI决策" />
+          <h3 class="panel-title">AI决策</h3>
+          <a href="https://chat.openai.com/" target="_blank" title="点击和GPT对话">
+            <img src="/images/AI.png" alt="AI决策" />
+          </a>
         </div>
         <div class="stats-list">
           <div class="stat-item">
@@ -158,27 +167,25 @@
         </div>
       </div>
       <div class="weather-info">
-        <div class="weather-grid">
+        <!-- 只有在 weather 有值后才渲染下面内容 -->
+        <div class="weather-grid" v-if="weather">
           <div class="weather-item">
             <i class="fas fa-temperature-low"></i>
-            <span>0~7°C</span>
+            <span>{{ weather.temperature }}</span>
           </div>
           <div class="weather-item">
             <i class="fas fa-wind"></i>
-            <span>东北风5级</span>
+            <span>{{ weather.wind }}</span>
           </div>
           <div class="weather-item">
             <i class="fas fa-tint"></i>
-            <span>96%</span>
-          </div>
-          <div class="weather-item">
-            <i class="fas fa-water"></i>
-            <span>78度</span>
+            <span>{{ weather.humidity }}</span>
           </div>
         </div>
-        <div class="weather-alert">
-          <div class="alert-time">2024-05-01 13:34</div>
-          <div class="alert-source">国家海洋局南海预报中心发布</div>
+
+        <div class="weather-alert" v-if="weather">
+          <div class="alert-time">{{ weather.reporttime }}</div>
+          <div class="alert-source">{{ weather.source }}</div>
         </div>
       </div>
     </div>
@@ -188,8 +195,34 @@
 <script>
 import { ref, onMounted, onUnmounted } from "vue";
 import * as echarts from "echarts";
+import axios from "axios";
 
 export default {
+  data(){
+    return{
+      currentVideo:1,
+    };
+  },
+  computed:{
+    currentVideoSrc(){
+      return `/videos/zhineng_${this.currentVideo}.mp4`;
+    },
+    leftEyeSrc() {
+      return `/videos/left_eye_${this.currentVideo}.mp4`;
+    },
+    rightEyeSrc() {
+      return `/videos/right_eye_${this.currentVideo}.mp4`;
+    }
+  },
+  methods:{
+    switchVideo(n){
+      this.currentVideo = n;
+      const videoEl = this.$refs.mainVideo;
+      if(videoE1){
+        videoE1.load();
+      }
+    }
+  },
   name: "IntelligentCenter",
   setup() {
     const gaugeChart = ref(null);
@@ -245,6 +278,46 @@ export default {
         clearInterval(interval);
       });
     };
+    const weather = ref({
+      temperature: '--',
+      wind: '--',
+      humidity: '--',
+      reporttime: '--',
+      city: '--',
+      source: '高德地图气象中心',
+    })
+
+    const getWeather = async () => {
+      try {
+        const key = 'cf66b80cc13dbeae7fcbbcc2c001af66'
+        const cityCode = '120000'
+        const res = await axios.get('https://restapi.amap.com/v3/weather/weatherInfo', {
+          params: {
+            key,
+            city: cityCode,
+            extensions: 'base',
+          },
+        })
+
+        console.log('天气数据返回：', res.data)
+
+
+
+        if (res.data.status === '1' ) {
+          const data = res.data.lives[0]
+          weather.value = {
+            temperature: data.temperature + '°C',
+            wind: data.winddirection +'风' + data.windpower+'级',
+            humidity: data.humidity + '%',
+            reporttime: data.reporttime,
+            city: data.city,
+            source: '高德地图气象中心',
+          }
+        }
+      } catch (err) {
+        console.error('天气获取失败：', err)
+      }
+    }
 
     // 初始化图表
     const initGaugeChart = () => {
@@ -398,6 +471,7 @@ export default {
     };
 
     onMounted(() => {
+      getWeather();
       initGaugeChart();
       initNetworkChart();
       updateEnvironmentData();
@@ -416,6 +490,7 @@ export default {
     });
 
     return {
+      weather,
       currentVideo,
       depthScores,
       switchVideo,
@@ -444,12 +519,41 @@ export default {
 }
 
 .left-panel,
-.center-panel,
-.right-panel {
+.center-panel{
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
+.right-panel{
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: min-content;
+}
+
+.bottom-cameras {
+  background-color: rgba(0, 30, 60, 0.5);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+  gap: 20px;
+}
+
+.bottom-cameras .camera-view {
+  flex: 1;
+  background: #111;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: rgba(0, 30, 60, 0.5);
+}
+
+.bottom-cameras .camera-view video {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
 
 .score-panel,
 .network-panel,
@@ -512,7 +616,7 @@ export default {
   margin-bottom: 20px;
 }
 
-.main-video {
+.main-video{
   position: relative;
   width: 100%;
   height: 400px;
@@ -627,11 +731,12 @@ export default {
 
 .camera-view {
   width: 100%;
-  height: 150px;
+  height: 200px;
   background-color: #000;
   margin-bottom: 20px;
   border-radius: 4px;
   overflow: hidden;
+  object-fit: contain;
 }
 
 .camera-view img {
@@ -651,8 +756,8 @@ export default {
 }
 
 .ai-logo img {
-  width: 100%;
-  height: 100%;
+  width: 70%;
+  height: 70%;
 }
 
 .stats-list {
