@@ -12,11 +12,12 @@ const instance = axios.create({
 // 请求拦截器
 instance.interceptors.request.use(
   (config) => {
-    // 从 localStorage 获取 token（如果后端实现了 token 机制）
+
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
     return config;
   },
   (error) => {
@@ -36,7 +37,8 @@ instance.interceptors.response.use(
           // 未授权，清除用户信息并跳转到登录页
           localStorage.removeItem("user");
           localStorage.removeItem("token");
-          window.location.href = "/login";
+         
+          // window.location.href = "/login";
           break;
         case 403:
           // 权限不足
