@@ -22,6 +22,8 @@ db.init_app(app)
 login_manager.init_app(app)
 register_error_handlers(app)
 app.register_blueprint(api)
+from api.alerts import alerts
+app.register_blueprint(alerts)
 @app.route('/', methods=['GET', 'POST'])
 @login_required
 def index():
