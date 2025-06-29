@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能鱼塘管理助手</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f0f8ff;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        .chat-container {
+            max-width: 800px;
+            margin: 20px auto;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            background-color: white;
+            overflow: hidden;
+        }
+        .chat-header {
+            background-color: #1e88e5;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.5rem;
+        }
+        .chat-messages {
+            height: 500px;
+            overflow-y: auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+        }
+        .user-message {
+            justify-content: flex-end;
+        }
+        .assistant-message {
+            justify-content: flex-start;
+        }
+        .message-content {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            position: relative;
+        }
+        .user-message .message-content {
+            background-color: #e3f2fd;
+            border-bottom-right-radius: 5px;
+        }
+        .assistant-message .message-content {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 5px;
+        }
+        .chat-input {
+            padding: 15px;
+            background-color: white;
+            border-top: 1px solid #eee;
+            display: flex;
+        }
+        #message-input {
+            flex-grow: 1;
+            border-radius: 20px;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+        }
+        #send-button {
+            margin-left: 10px;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            background-color: #1e88e5;
+            color: white;
+            border: none;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .user-avatar {
+            background-color: #42a5f5;
+        }
+        .assistant-avatar {
+            background-color: #66bb6a;
+        }
+        .typing-indicator {
+            display: none;
+            padding: 10px;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <i class="fas fa-fish me-2"></i>智能鱼塘管理助手
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="message assistant-message">
+                <div class="avatar assistant-avatar">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="message-content">
+                    您好！我是智能鱼塘管理助手，请问有什么可以帮您的吗？
+                </div>
+            </div>
+        </div>
+        <div class="typing-indicator" id="typing-indicator">
+            助手正在输入...
+        </div>
+        <div class="chat-input">
+            <input type="text" id="message-input" placeholder="输入您的问题...">
+            <button id="send-button" type="button">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+            <input type="hidden" id="session-id" value="{{ session_id }}">
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            const messageInput = $('#message-input');
+            const chatMessages = $('#chat-messages');
+            const typingIndicator = $('#typing-indicator');
+            const sessionId = $('#session-id').val();
+
+            function scrollToBottom() {
+                chatMessages.scrollTop(chatMessages[0].scrollHeight);
+            }
+
+            function addMessage(role, content) {
+                const messageClass = role === 'user' ? 'user-message' : 'assistant-message';
+                const avatarClass = role === 'user' ? 'user-avatar' : 'assistant-avatar';
+                const icon = role === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+
+                const messageHtml = `
+                    <div class="message ${messageClass}">
+                        <div class="avatar ${avatarClass}">
+                            ${icon}
+                        </div>
+                        <div class="message-content">
+                            ${content}
+                        </div>
+                    </div>
+                `;
+
+                chatMessages.append(messageHtml);
+                scrollToBottom();
+            }
+
+            function sendMessage() {
+                const message = messageInput.val().trim();
+                if (message === '') return;
+
+                // Add user message to chat
+                addMessage('user', message);
+                messageInput.val('');
+
+                // Show typing indicator
+                typingIndicator.show();
+                scrollToBottom();
+
+                // Send message to server
+                $.ajax({
+                    url: '/chat',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        message: message,
+                        session_id: sessionId
+                    }),
+                    success: function(response) {
+                        // Hide typing indicator
+                        typingIndicator.hide();
+
+                        // Add assistant response to chat
+                        addMessage('assistant', response.response);
+                    },
+                    error: function() {
+                        typingIndicator.hide();
+                        addMessage('assistant', '抱歉，出现了一些问题，请稍后再试。');
+                    }
+                });
+            }
+
+            // Send message when button is clicked
+            $('#send-button').click(sendMessage);
+
+            // Send message when Enter key is pressed
+            messageInput.keypress(function(e) {
+                if (e.which === 13) {
+                    sendMessage();
+                }
+            });
+
+            // Focus input field on page load
+            messageInput.focus();
+        });
+    </script>
+</body>
+</html>
