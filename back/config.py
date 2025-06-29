@@ -7,5 +7,8 @@ project_root = os.path.dirname(current_file_path)
 
 class Config:
     # 使用项目根目录下的 marine.db
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(project_root, 'marine.db')
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///marine.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SECRET_KEY="2sasa"
+    ALGORITHM="HS256"
+    

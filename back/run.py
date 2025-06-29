@@ -1,137 +1,29 @@
-from flask import Flask, render_template, redirect, url_for, request, jsonify, abort
-from flask_sqlalchemy import SQLAlchemy
+import csv
+from io import StringIO
+
+from flask import Flask, render_template, redirect, url_for, request, jsonify, abort, make_response
 from flask_cors import CORS
 from flask_login import (
-    LoginManager,
-    UserMixin,
     login_user,
     logout_user,
     login_required,
     current_user,
 )
-from werkzeug.security import generate_password_hash, check_password_hash
-from functools import wraps
+from utils.utils import jwt_required,generate_jwt
+from extensions.error_handlers import register_error_handlers
+from models.models import *
+from config import Config
+from api import api
 import requests
-
-# ------------ 初始化应用 ------------
 app = Flask(__name__)
-CORS(app, supports_credentials=True)  # 允许跨域带凭证
-app.config['SECRET_KEY'] = 'your-secret-key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///marine.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# 初始化扩展
-db = SQLAlchemy(app)
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
-
-# ------------ 定义模型 ------------
-# 新增权限常量类
-class Permission:
-    DATA_VIEW = 0x01    # 查看数据权限 (00000001)
-    DATA_EDIT = 0x02    # 编辑数据权限 (00000010)
-    USER_MANAGE = 0x04  # 用户管理权限 (00000100)
-    SITE_MANAGE = 0x08  # 站点管理权限 (00001000)
-    ADMIN = 0x80        # 管理员权限 (10000000)
-
-
-class User(db.Model, UserMixin):
-    __tablename__ = 'user'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True)
-    password_hash = db.Column(db.String(100))
-    role = db.Column(db.String(20), default='user')
-    permissions = db.Column(db.Integer, default=0)
-    is_active = db.Column(db.Boolean, default=True)
-
-    def __init__(self, **kwargs):
-        super(User, self).__init__(**kwargs)
-        if self.role == 'admin':
-            self.permissions = Permission.ADMIN | Permission.DATA_VIEW | Permission.DATA_EDIT | Permission.USER_MANAGE | Permission.SITE_MANAGE
-
-    @property
-    def password(self):
-        raise AttributeError('密码不可读')
-
-    @password.setter
-    def password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def verify_password(self, password):
-        return check_password_hash(self.password_hash, password)
-
-    def has_permission(self, perm):
-        return (self.permissions & perm) == perm
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "username": self.username,
-            "role": self.role,
-            "permissions": self.permissions
-        }
-
-class Site(db.Model):
-    __tablename__ = 'site'
-    id = db.Column(db.Integer, primary_key=True)
-    province = db.Column(db.String(50))
-    basin = db.Column(db.String(50))
-    site_name = db.Column(db.String(100))
-    site_status = db.Column(db.String(50))
-
-class MonitorData(db.Model):
-    __tablename__ = 'monitor_data'
-    id = db.Column(db.Integer, primary_key=True)
-    site_id = db.Column(db.Integer, db.ForeignKey('site.id'))
-    monitor_date = db.Column(db.Date)  # 日期字段（YYYY-MM-DD）
-    monitor_time = db.Column(db.Time)  # 时间字段（HH:MM:SS）<-- 新增字段
-    water_quality_class = db.Column(db.String(20))          # 水质类别
-    temperature = db.Column(db.Float)                       # 水温(℃)
-    ph = db.Column(db.Float)                                # pH(无量纲)
-    dissolved_oxygen = db.Column(db.Float)                  # 溶解氧(mg/L)
-    conductivity = db.Column(db.Float)                      # 电导率(μS/cm)
-    turbidity = db.Column(db.Float)                         # 浊度(NTU)
-    permanganate_index = db.Column(db.Float)                # 高锰酸盐指数(mg/L)
-    ammonia_nitrogen = db.Column(db.Float)                  # 氨氮(mg/L)
-    total_phosphorus = db.Column(db.Float)                  # 总磷(mg/L)
-    total_nitrogen = db.Column(db.Float)                    # 总氮(mg/L)
-    chlorophyll_alpha = db.Column(db.Float)                 # 叶绿素α(mg/L)
-    algae_density = db.Column(db.Float)                     # 藻密度(cells/L)
-
-
-
-class Fish(db.Model):
-    __tablename__ = 'fish'
-    id = db.Column(db.Integer, primary_key=True)
-    species = db.Column(db.String(50))        # 鱼类名称
-    weight = db.Column(db.Float)              # 重量（克）
-    length1 = db.Column(db.Float)             # 长度1（厘米）
-    length2 = db.Column(db.Float)             # 长度2（厘米）
-    length3 = db.Column(db.Float)             # 长度3（厘米）
-    height = db.Column(db.Float)              # 高度（厘米）
-    width = db.Column(db.Float)               # 宽度（厘米）
-
-# ------------ 权限装饰器 ------------
-def permission_required(perm):
-    def decorator(f):
-        @wraps(f)
-        @login_required
-        def decorated_function(*args, **kwargs):
-            if not current_user.has_permission(perm):
-                abort(403)
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
-
-def admin_required(f):
-    return permission_required(Permission.ADMIN)(f)
-
-# ------------ 用户加载器 ------------
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
-# ------------ 所有路由 ------------
+app.config.from_object(Config)
+CORS(app, supports_credentials=True)
+db.init_app(app)
+login_manager.init_app(app)
+register_error_handlers(app)
+app.register_blueprint(api)
+from api.alerts import alerts
+app.register_blueprint(alerts)
 @app.route('/', methods=['GET', 'POST'])
 @login_required
 def index():
@@ -151,7 +43,6 @@ def smart_center():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # 强制解析JSON数据，忽略Content-Type
         try:
             data = request.get_json(force=True)
         except Exception as e:
@@ -169,9 +60,11 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.verify_password(password):
             login_user(user)
+            token=generate_jwt(user.to_dict())
             return jsonify({
                 "success": True,
                 "user": user.to_dict(),
+                "token": token,
                 "message": "登录成功"
             })
         else:
@@ -179,7 +72,6 @@ def login():
 
     # 处理GET请求（如果有）
     return render_template('login.html')
-
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -213,10 +105,13 @@ def register():
             )
             db.session.add(user)
             db.session.commit()
+            token=generate_jwt(user.to_dict())
+           
             return jsonify({
                 "success": True,
                 "message": "注册成功",
-                "user_id": user.id
+                "user_id": user.id,
+                "token": token
             }), 201
         except Exception as e:
             db.session.rollback()
@@ -224,7 +119,16 @@ def register():
 
     # 处理GET请求
     return render_template('register.html')
-
+from flask import g
+@app.route('/auth')
+@jwt_required
+def auth():
+    return jsonify({
+        "success": True,
+        "message": "已登录",
+        "user_id": g.current_user,
+        "code":200
+    })
 @app.route('/logout', methods=['GET', 'POST'])
 @login_required
 def logout():
@@ -246,10 +150,11 @@ def admin():
     return render_template('admin.html')
 
 @app.route('/water_quality', methods=['GET', 'POST'])
-@permission_required(Permission.DATA_VIEW)
+# @permission_required(Permission.DATA_VIEW)
 def water_quality():
     data = MonitorData.query.all()
     return jsonify([{
+        'site':d.site_id,
         'date': d.monitor_date.strftime('%Y-%m-%d'),
         'time': d.monitor_time.strftime('%H:%M:%S') if d.monitor_time else None,  # 新增时间字段
         'water_quality_class': d.water_quality_class,
@@ -267,12 +172,65 @@ def water_quality():
     } for d in data])
 
 
+@app.route('/getsite', methods=['GET', 'POST'])
+# @permission_required(Permission.DATA_VIEW)
+def get_site():
+    data = Site.query.all()
+    return jsonify([
+        {
+            'id': d.id,
+            'province': d.province,
+            'basin': d.basin,
+            'site_name': d.site_name,
+            'status': d.site_status
+        } for d in data
+    ])
+
+@app.route('/merged_data', methods=['GET', 'POST'])
+# @permission_required(Permission.DATA_VIEW)
+def merged_data():
+    try:
+        water_quality_data = MonitorData.query.all()
+        site_data = Site.query.all()
+
+        site_dict = {site.id: site for site in site_data}
+        merged = []
+        for water in water_quality_data:
+            site = site_dict.get(water.site_id)
+            if site:
+                merged.append({
+                'site_id': water.site_id,
+                'site_name': site.site_name,
+                'province': site.province,
+                'basin': site.basin,
+                'status': site.site_status,
+                'date': water.monitor_date.strftime('%Y-%m-%d'),
+                'time': water.monitor_time.strftime('%H:%M:%S') if water.monitor_time else None,
+                'water_quality_class': water.water_quality_class,
+                'temperature': water.temperature,
+                'ph': water.ph,
+                'dissolved_oxygen': water.dissolved_oxygen,
+                'conductivity': water.conductivity,
+                'turbidity': water.turbidity,
+                'permanganate_index': water.permanganate_index,
+                'ammonia_nitrogen': water.ammonia_nitrogen,
+                'total_phosphorus': water.total_phosphorus,
+                'total_nitrogen': water.total_nitrogen,
+                'chlorophyll_alpha': water.chlorophyll_alpha,
+                'algae_density': water.algae_density
+                })
+
+        return jsonify(merged)
+    except Exception as e:
+        print("merged_data 接口错误：", str(e))
+        return jsonify({"error": str(e)}), 500
+
 # ------------ 鱼类数据接口 ------------
 @app.route('/fish', methods=['GET', 'POST'])
-@login_required
+# @login_required
 def fish_collection():
-        fishes = Fish.query.all()
-        return jsonify([{
+    fishes = Fish.query.all()
+    return jsonify([{
             'id': fish.id,
             'species': fish.species,
             'weight': fish.weight,
@@ -329,55 +287,302 @@ def get_weather():
         return jsonify({"error": "天气数据解析失败"}), 500
     except Exception as e:
         return jsonify({"error": "服务器内部错误", "details": str(e)}), 500
-
-
-@app.errorhandler(400)
-def bad_request(e):
-    return jsonify(success=False, message="请求参数错误"), 400
-
-@app.errorhandler(401)
-def unauthorized(e):
-    return jsonify(success=False, message="未授权访问"), 401
-
-@app.errorhandler(403)
-def forbidden(e):
-    return jsonify(success=False, message="禁止访问"), 403
-
-@app.errorhandler(404)
-def not_found(e):
-    return jsonify(success=False, message="资源不存在"), 404
-
-@app.errorhandler(500)
-def internal_error(e):
-    return jsonify(success=False, message="服务器内部错误"), 500
-
-import requests
-
-# ------------ 初始化函数 ------------
-def create_initial_roles():
-    if not User.query.filter_by(username='admin').first():
-        admin = User(
-            username='admin',
-            password=generate_password_hash('admin123'),
-            role='admin'
-        )
-        db.session.add(admin)
-        db.session.commit()
-
-
-# ------------ 模板上下文注入 ------------
 @app.context_processor
 def inject_permissions():
     return dict(Permission=Permission)
 
-# ------------ 启动应用 ------------
+
+# 在 run.py 中添加以下内容
+
+@app.route('/monitor_data', methods=['GET'])
+@jwt_required
+def export_monitor_data():
+
+    # 获取所有监测数据
+    data = MonitorData.query.all()
+
+    # 创建 CSV 字符串
+    csv_output = StringIO()
+    csv_writer = csv.writer(csv_output)
+
+    # 写入表头
+    headers = ['站点ID', '监测日期', '监测时间', '水质类别', '水温(℃)', 'pH', '溶解氧(mg/L)',
+               '电导率(μS/cm)', '浊度(NTU)', '高锰酸盐指数(mg/L)', '氨氮(mg/L)',
+               '总磷(mg/L)', '总氮(mg/L)', '叶绿素α(mg/L)', '藻密度(cells/L)']
+    csv_writer.writerow(headers)
+
+    # 写入数据行
+    for d in data:
+        csv_writer.writerow([
+            d.site_id,
+            d.monitor_date.strftime('%Y-%m-%d') if d.monitor_date else '',
+            d.monitor_time.strftime('%H:%M:%S') if d.monitor_time else '',
+            d.water_quality_class,
+            d.temperature,
+            d.ph,
+            d.dissolved_oxygen,
+            d.conductivity,
+            d.turbidity,
+            d.permanganate_index,
+            d.ammonia_nitrogen,
+            d.total_phosphorus,
+            d.total_nitrogen,
+            d.chlorophyll_alpha,
+            d.algae_density
+        ])
+
+    # 创建响应对象
+    output = make_response(csv_output.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=monitor_data.csv"
+    output.headers["Content-type"] = "text/csv"
+    return output
+
+
+@app.route('/sites', methods=['GET'])
+@jwt_required
+def export_sites():
+    sites = Site.query.all()
+
+    csv_output = StringIO()
+    csv_writer = csv.writer(csv_output)
+
+    headers = ['站点ID', '省份', '流域', '站点名称', '站点状态']
+    csv_writer.writerow(headers)
+
+    for site in sites:
+        csv_writer.writerow([
+            site.id,
+            site.province,
+            site.basin,
+            site.site_name,
+            site.site_status
+        ])
+
+    output = make_response(csv_output.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=sites.csv"
+    output.headers["Content-type"] = "text/csv"
+    return output
+
+
+# 在 run.py 中添加以下内容
+
+@app.route('/import', methods=['POST'])
+@jwt_required
+def import_monitor_data():
+    if 'file' not in request.files:
+        return jsonify(success=False, message="没有文件"), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify(success=False, message="没有选择文件"), 400
+
+    if not file.filename.endswith('.csv'):
+        return jsonify(success=False, message="文件格式不正确"), 400
+
+    try:
+        # 读取 CSV 文件
+        stream = StringIO(file.stream.read().decode("GBK"), newline=None)
+        csv_reader = csv.reader(stream)
+        next(csv_reader)  # 跳过表头
+
+        for row in csv_reader:
+            # 解析行数据
+            if len(row) < 15:  # 检查列数
+                continue
+
+            monitor_data = MonitorData(
+                site_id=int(row[0]),
+                monitor_date=datetime.strptime(row[1], '%m/%d/%Y').date() if row[1] else None,                monitor_time=datetime.strptime(row[2], '%H:%M:%S').time() if row[2] else None,
+                water_quality_class=row[3],
+                temperature=float(row[4]) if row[4] else None,
+                ph=float(row[5]) if row[5] else None,
+                dissolved_oxygen=float(row[6]) if row[6] else None,
+                conductivity=float(row[7]) if row[7] else None,
+                turbidity=float(row[8]) if row[8] else None,
+                permanganate_index=float(row[9]) if row[9] else None,
+                ammonia_nitrogen=float(row[10]) if row[10] else None,
+                total_phosphorus=float(row[11]) if row[11] else None,
+                total_nitrogen=float(row[12]) if row[12] else None,
+                chlorophyll_alpha=float(row[13]) if row[13] else None,
+                algae_density=float(row[14]) if row[14] else None
+            )
+            db.session.add(monitor_data)
+
+        db.session.commit()
+        return jsonify(success=True, message="数据导入成功")
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(success=False, message=f"导入失败: {str(e)}"), 500
+
+
+@app.route('/fish_export', methods=['GET'])
+@jwt_required
+def export_fish_data():
+    # 获取所有鱼类数据
+    fishes = Fish.query.all()
+
+    # 创建 CSV 字符串
+    csv_output = StringIO()
+    csv_writer = csv.writer(csv_output)
+
+    # 写入表头
+    headers = ['ID', '物种', '重量(g)', '体长1(cm)', '体长2(cm)', '体长3(cm)', '高度(cm)', '宽度(cm)']
+    csv_writer.writerow(headers)
+
+    # 写入数据行
+    for fish in fishes:
+        csv_writer.writerow([
+            fish.id,
+            fish.species,
+            fish.weight,
+            fish.length1,
+            fish.length2,
+            fish.length3,
+            fish.height,
+            fish.width
+        ])
+
+    # 创建响应对象
+    output = make_response(csv_output.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=fish_data.csv"
+    output.headers["Content-type"] = "text/csv"
+    return output
+
+
+@app.route('/fish_stats', methods=['GET'])
+@jwt_required
+def get_fish_stats():
+    try:
+        # 获取不同鱼种数量
+        species_count = db.session.query(db.func.count(db.distinct(Fish.species))).scalar()
+
+        # 获取鱼的总数量
+        total_fish = db.session.query(db.func.count(Fish.id)).scalar()
+
+        # 计算平均重量
+        avg_weight = db.session.query(db.func.avg(Fish.weight)).scalar() or 0
+
+        return jsonify({
+            "success": True,
+            "species_count": species_count,
+            "total_fish": total_fish,
+            "avg_weight": round(avg_weight, 2)
+        })
+    except Exception as e:
+        print(f"获取鱼类统计数据失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "获取鱼类统计数据失败",
+            "error": str(e)
+        }), 500
+
+
+@app.route('/fish_metrics', methods=['GET'])
+@jwt_required
+def get_fish_metrics():
+    try:
+        # 获取不同鱼种数量
+        species_count = db.session.query(db.func.count(db.distinct(Fish.species))).scalar()
+
+        # 获取鱼的总数量
+        total_fish = db.session.query(db.func.count(Fish.id)).scalar()
+
+        # 计算平均重量
+        avg_weight = db.session.query(db.func.avg(Fish.weight)).scalar() or 0
+
+        # 计算平均体长（使用length1字段）
+        avg_length = db.session.query(db.func.avg(Fish.length1)).scalar() or 0
+
+        # 获取今日新增鱼的数量
+        today = datetime.now().date()
+        today_added = db.session.query(db.func.count(Fish.id)) \
+                          .filter(Fish.created_at >= today) \
+                          .scalar() or 0
+
+        return jsonify({
+            "success": True,
+            "species_count": species_count,
+            "total_fish": total_fish,
+            "avg_weight": round(avg_weight, 1),
+            "avg_length": round(avg_length, 1),
+            "today_added": today_added
+        })
+    except Exception as e:
+        print(f"获取鱼类指标失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "获取鱼类指标失败",
+            "error": str(e)
+        }), 500
+
+@app.route('/fish_analysis', methods=['GET'])
+@jwt_required
+def fish_analysis():
+    try:
+        # 按照鱼种分组，统计每种鱼的平均重量、平均高度、平均长度和平均宽度
+        analysis_data = db.session.query(
+            Fish.species,
+            db.func.avg(Fish.weight).label('avg_weight'),
+            db.func.avg(Fish.height).label('avg_height'),
+            db.func.avg(Fish.length1).label('avg_length'),  # 假设使用 length1 作为长度字段
+            db.func.avg(Fish.width).label('avg_width')
+        ).group_by(Fish.species).all()
+
+        result = []
+        for row in analysis_data:
+            result.append({
+                'species': row.species,
+                'avg_weight': round(row.avg_weight, 2),
+                'avg_height': round(row.avg_height, 2),
+                'avg_length': round(row.avg_length, 2),
+                'avg_width': round(row.avg_width, 2)
+            })
+
+        return jsonify({
+            "success": True,
+            "data": result
+        })
+    except Exception as e:
+        print(f"获取鱼类分析数据失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "获取鱼类分析数据失败",
+            "error": str(e)
+        }), 500
+
+
+@app.route('/province_site_count', methods=['GET'])
+@jwt_required
+def get_province_site_count():
+    try:
+        # 统计不同省份的站点数量
+        province_site_count = db.session.query(Site.province, db.func.count(Site.id)).group_by(Site.province).all()
+
+        result = []
+        for province, count in province_site_count:
+            result.append({
+                'province': province,
+                'site_count': count
+            })
+
+        # 返回统一格式的响应
+        return jsonify({
+            "success": True,
+            "code": 200,
+            "message": "获取成功",
+            "data": result
+        })
+    except Exception as e:
+        print(f"获取不同省份的站点数量失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "code": 500,
+            "message": "获取不同省份的站点数量失败",
+            "error": str(e)
+        }), 500
+
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-        # 初始化管理员（密码自动哈希）
-        if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', role='admin')
-            admin.password = 'admin123'  # 调用password setter
-            db.session.add(admin)
-            db.session.commit()
+       init_db(db)
     app.run(debug=True)
