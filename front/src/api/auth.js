@@ -319,3 +319,14 @@ export const getFishAnalysis = async () => {
 export const getProvinceSiteCount = () => {
   return axios.get('/province_site_count', { withCredentials: true });
 };
+
+export const getEchartData = (rangeStr, siteName, metricStr) => {
+  return axios.get('/get-axis', {
+    params: {
+      range: rangeStr,
+      site: siteName,
+      metric: metricStr
+    },
+    withCredentials: true
+  });
+};
