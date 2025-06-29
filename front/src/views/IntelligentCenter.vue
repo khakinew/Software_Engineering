@@ -28,7 +28,7 @@
       </div>
       <div class="network-panel">
         <h3 class="panel-title">网衰监测</h3>
-        <div class="bar-chart" ref="networkChart"></div>
+        <div class="province-chart" ref="networkChart" @dblclick="handleNetloadChart"></div>
         <div class="network-info">
           <div class="info-date">网衰破损（2024-02-01）</div>
         </div>
@@ -196,6 +196,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import * as echarts from "echarts";
 import axios from "axios";
+import { downloadEChart } from "@/utils/echart";
 
 export default {
   data(){
@@ -211,7 +212,7 @@ export default {
       return `/videos/left_eye_${this.currentVideo}.mp4`;
     },
     rightEyeSrc() {
-      return `/videos/right_eye_${this.currentVideo}.mp4`;
+      return `/videos/shiping_${this.currentVideo}.mp4`;
     }
   },
   methods:{
@@ -418,7 +419,7 @@ export default {
     };
 
     const initNetworkChart = () => {
-      const chart = echarts.init(document.querySelector(".bar-chart"));
+      const chart = echarts.init(document.querySelector(".province-chart"));
       const option = {
         grid: {
           left: "3%",
@@ -426,6 +427,7 @@ export default {
           bottom: "3%",
           containLabel: true,
         },
+        tooltip: { trigger: "axis" },
         xAxis: {
           type: "category",
           data: [
@@ -465,6 +467,14 @@ export default {
       chart.setOption(option);
       networkChart.value = chart;
     };
+    const handleNetloadChart = () => {
+      if (networkChart.value) {
+        downloadEChart(networkChart.value, "network_chart.png");
+      } else {
+        console.warn("networkChart 未初始化");
+      }
+    };
+
 
     const switchVideo = (n) => {
       currentVideo.value = n;
@@ -490,6 +500,7 @@ export default {
     });
 
     return {
+      handleNetloadChart,
       weather,
       currentVideo,
       depthScores,
@@ -602,7 +613,7 @@ export default {
   font-size: 24px;
 }
 
-.bar-chart {
+.province-chart {
   height: 200px;
 }
 
