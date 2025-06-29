@@ -1,6 +1,5 @@
 import { createStore } from "vuex";
-import { authApi } from "../api/auth";
-
+import { authApi,auth } from "../api/auth";
 // 默认管理员账号
 const ADMIN_CREDENTIALS = {
   username: "admin",
@@ -113,13 +112,15 @@ export default createStore({
       }
     },
 
-    checkAuth({ commit }) {
-      // 先检查 sessionStorage（当前会话）
+     checkAuth({ commit }) {
+    
+       auth().then(res=>{
+        console.log(res);
+        
+       })
       let isAuthenticated =
         sessionStorage.getItem("isAuthenticated") === "true";
       let user = JSON.parse(sessionStorage.getItem("user"));
-
-      // 如果在 sessionStorage 中没有找到，再检查 localStorage（持久存储）
       if (!isAuthenticated) {
         isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
         user = JSON.parse(localStorage.getItem("user"));
